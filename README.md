@@ -103,8 +103,8 @@ enterprise tool.
 | Smooth Scroll | Lenis |
 | Icons | lucide-react |
 
-The full visual language — colors, glass rules, typography, motion, do's &
-don'ts — lives in [`DESIGN.md`](./DESIGN.md). Any AI coding agent (or human!)
+The full visual language colors, glass rules, typography, motion, do's &
+don'ts lives in [`DESIGN.md`](./DESIGN.md). Any AI coding agent (or human!)
 working on this repo should read that first.
 
 ---
@@ -128,3 +128,96 @@ Open [http://localhost:3000](http://localhost:3000) to view it.
 ---
 
 ## 📁 Project Structure
+
+## Project Structure
+
+```
+FrontEnd_2.0/
+├── app/                       # Next.js App Router pages
+│   ├── page.tsx               # Landing page
+│   ├── layout.tsx             # Root layout
+│   ├── globals.css            # Global styles + Tailwind layer
+│   ├── login/                 # Auth screens
+│   ├── register/
+│   ├── order/                 # Multi-step order flow
+│   ├── orders/                # Order history + live tracking
+│   └── profile/                # Account & saved addresses
+│
+├── components/                 # Reusable UI
+│   ├── hero/                   # Scroll-scrubbed sequence hero
+│   ├── sections/                # Landing page sections
+│   └── ui/                      # Shared glass UI primitives
+│
+├── public/
+│   ├── images/
+│   │   └── sequence/            # Hero scroll-sequence frames (120)
+│   └── icons/                   # Feature & step icons
+│
+├── DESIGN.md                    # 🎨 Design system reference
+├── AGENTS.md                    # Instructions for AI coding agents
+├── CLAUDE.md                    # Claude-specific agent context
+├── README.md                    # You are here
+├── next.config.ts               # Next.js configuration
+├── tsconfig.json                # TypeScript configuration
+├── tailwind.config.ts           # Tailwind theme (green tokens live here)
+├── postcss.config.mjs           # PostCSS config (Tailwind pipeline)
+├── eslint.config.mjs            # Linting rules
+├── package.json                 # Dependencies & scripts
+├── package-lock.json            # Locked dependency versions
+└── .gitignore                   # Files excluded from git
+```
+
+
+> 🤖 **What are `AGENTS.md` and `CLAUDE.md`?** This project was built in
+> close collaboration with AI coding agents (Google Antigravity), which
+> generate these files to keep track of project specific build conventions
+> across sessions. `DESIGN.md` is the one that actually matters for
+> contributors it's the design system spec both humans and agents follow.
+
+---
+
+## 🎨 Design System
+
+This project follows a documented design system rather than ad hoc styling
+see [`DESIGN.md`](./DESIGN.md) for the full spec:
+
+- 🎨 Color tokens & roles
+- ✍️ Typography scale
+- 🧊 The `.glass` component pattern
+- 🎞️ Motion language & easing rules
+- 📱 Responsive & accessibility behavior
+
+---
+
+## 👥 Team - Group 20
+
+<div align="center">
+
+| Member | Focus Area |
+|---|---|
+| **Gunasekara P.S.I** | Identity, Access & Security |
+| **Kethmika K.A.D.Y.** | Rail Capacity Allocation & Spillover |
+| **Praghathees K.** | Truck Roster & Driver Assignment Engine |
+| **Indrasiri K.B.S.H.** | Station Inventory & Warehouse Operations |
+| **Sewwandi P.D.Y.** | Reporting, Analytics & QA |
+
+*Department of Computer Science & Engineering, University of Moratuwa*
+
+</div>
+
+---
+
+## 📜 License
+
+This project is built for academic purposes as part of CS3043 - Database
+Systems. All rights reserved by Group 20 unless otherwise stated.
+
+---
+
+<div align="center">
+
+**Built with 💚 and a lot of scroll-jank debugging.**
+
+<sub>⭐ Star this repo if you liked the scroll effect</sub>
+
+</div>
