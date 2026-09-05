@@ -1,26 +1,354 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════
+   Kandypack Design System — "Light Green Glass"
+   Follows DESIGN.md exactly. Light mode only.
+   ═══════════════════════════════════════════ */
+
+/* ── CSS Custom Properties ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --bg-base: #F5FAF7;
+  --bg-base-alt: #EEF7F1;
+
+  /* Glass surfaces */
+  --surface-glass: rgba(255, 255, 255, 0.55);
+  --surface-glass-border: rgba(255, 255, 255, 0.35);
+
+  /* Primary green scale (built around #16A34A) */
+  --green-50: #F0FDF4;
+  --green-100: #DCFCE7;
+  --green-200: #BBF7D0;
+  --green-300: #86EFAC;
+  --green-400: #4ADE80;
+  --green-500: #22C55E;
+  --green-600: #16A34A;
+  --green-700: #15803D;
+  --green-800: #166534;
+  --green-900: #14532D;
+
+  /* Accent */
+  --mint-glow: #6EE7B4;
+
+  /* Text */
+  --text-heading: #0F1A14;
+  --text-body: #4B5A52;
+  --text-muted: #7C8C84;
+
+  /* Status colors (used ONLY for order status pills) */
+  --status-pending: #F59E0B;
+  --status-transit: #3B82F6;
+  --status-delivered: #16A34A;
+  --status-issue: #EF4444;
 }
 
+/* ── Tailwind v4 Theme Extension ── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Colors */
+  --color-bg-base: var(--bg-base);
+  --color-bg-base-alt: var(--bg-base-alt);
+  --color-surface-glass: var(--surface-glass);
+  --color-surface-glass-border: var(--surface-glass-border);
+
+  --color-green-50: var(--green-50);
+  --color-green-100: var(--green-100);
+  --color-green-200: var(--green-200);
+  --color-green-300: var(--green-300);
+  --color-green-400: var(--green-400);
+  --color-green-500: var(--green-500);
+  --color-green-600: var(--green-600);
+  --color-green-700: var(--green-700);
+  --color-green-800: var(--green-800);
+  --color-green-900: var(--green-900);
+
+  --color-mint-glow: var(--mint-glow);
+
+  --color-text-heading: var(--text-heading);
+  --color-text-body: var(--text-body);
+  --color-text-muted: var(--text-muted);
+
+  --color-status-pending: var(--status-pending);
+  --color-status-transit: var(--status-transit);
+  --color-status-delivered: var(--status-delivered);
+  --color-status-issue: var(--status-issue);
+
+  /* Fonts */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* Border radius */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Shadows — soft, green-tinted */
+  --shadow-glass: 0 8px 32px rgba(22, 163, 74, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-glass-hover: 0 12px 48px rgba(22, 163, 74, 0.14), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-btn-glow: 0 4px 24px rgba(22, 163, 74, 0.3);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base Styles ── */
+html {
+  scroll-behavior: auto; /* Lenis handles smooth scroll */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-body);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Typography ── */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-heading);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+h1 {
+  font-size: clamp(2.75rem, 6vw, 5rem);
+  font-weight: 700;
+}
+
+h2 {
+  font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+}
+
+h3 {
+  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+}
+
+p {
+  color: var(--text-body);
+  line-height: 1.7;
+}
+
+/* Captions / labels */
+.caption {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* Tabular nums for stat counters */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Glass Panel — the signature primitive ── */
+.glass {
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--surface-glass-border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-glass);
+}
+
+.glass-sm {
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--surface-glass-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-glass);
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: var(--green-600);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-btn-glow);
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--surface-glass-border);
+  color: var(--green-600);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out, border-color 200ms ease-out;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-glass-hover);
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+.btn-secondary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-secondary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+}
+
+/* ── Status Pills ── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-pill-pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--status-pending);
+}
+
+.status-pill-transit {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--status-transit);
+}
+
+.status-pill-delivered {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--status-delivered);
+}
+
+.status-pill-issue {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--status-issue);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Form Inputs ── */
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--surface-glass-border);
+  border-radius: 12px;
+  color: var(--text-heading);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input:focus {
+  border-color: var(--green-600);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input label */
+.input-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-heading);
+}
+
+/* ── Focus States (global) ── */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+  border-radius: 8px;
+}
+
+/* ── Link base ── */
+a {
+  color: var(--green-600);
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+
+a:hover {
+  color: var(--green-500);
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(22, 163, 74, 0.15);
+  color: var(--text-heading);
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Mobile glass performance ── */
+@media (max-width: 767px) {
+  .glass,
+  .glass-sm {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }
