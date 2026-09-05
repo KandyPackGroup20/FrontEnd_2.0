@@ -64,18 +64,12 @@ enterprise tool.
 
 <br/><br/>
 
-<img src="docs/screenshots/landing-page.png" alt="Landing page" width="45%" />
-<img src="docs/screenshots/order-tracking.png" alt="Live order tracking" width="45%" />
+<img src="landing-page.png" alt="Landing page" width="45%" />
+<img src="shipment.png" alt="Live order tracking" width="45%" />
 
 *Landing page (left) · Real time order tracking timeline (right)*
 
 </div>
-
-> 📸 **Note for the team:** drop actual screenshots/GIFs into a `docs/screenshots/`
-> folder at the repo root using the filenames above, and these will render
-> automatically. A short screen recording of the hero scroll effect converted
-> to GIF (via [ScreenToGif](https://www.screentogif.com/) or similar) sells
-> this project hard worth prioritizing over the static screenshots.
 
 ---
 
