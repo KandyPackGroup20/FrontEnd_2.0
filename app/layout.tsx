@@ -11,7 +11,7 @@ const geist = Geist({
 export const metadata: Metadata = {
   metadataBase: new URL("https://kandypack.lk"),
   title: {
-    default: "Kandypack — Rail & Road Logistics for Sri Lanka",
+    default: "Kandypack: Rail & Road Logistics for Sri Lanka",
     template: "%s | Kandypack",
   },
   description:
@@ -27,9 +27,9 @@ export const metadata: Metadata = {
     "delivery tracking",
   ],
   openGraph: {
-    title: "Kandypack — Rail & Road Logistics for Sri Lanka",
+    title: "Kandypack: Rail & Road Logistics for Sri Lanka",
     description:
-      "Sri Lanka's first hybrid logistics network — rail efficiency meets last-mile truck delivery.",
+      "Sri Lanka's first hybrid logistics network: rail efficiency meets last-mile truck delivery.",
     url: "https://kandypack.lk",
     siteName: "Kandypack",
     images: [
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
         url: "/images/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Kandypack — Ship smarter with rail to road logistics",
+        alt: "Kandypack: Ship smarter with rail to road logistics",
       },
     ],
     locale: "en_US",
@@ -45,9 +45,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Kandypack — Rail & Road Logistics for Sri Lanka",
+    title: "Kandypack: Rail & Road Logistics for Sri Lanka",
     description:
-      "Sri Lanka's first hybrid logistics network — rail efficiency meets last-mile truck delivery.",
+      "Sri Lanka's first hybrid logistics network: rail efficiency meets last-mile truck delivery.",
     images: ["/images/og-image.png"],
   },
   robots: {

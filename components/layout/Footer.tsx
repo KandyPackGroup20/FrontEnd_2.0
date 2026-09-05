@@ -46,7 +46,7 @@ export default function Footer() {
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-text-body">
               Sri Lanka&apos;s first rail + road logistics platform. Ship FMCG
-              goods from Kandy to six regional hubs — fast, trackable,
+              goods from Kandy to six regional hubs, fast, trackable,
               affordable.
             </p>
             <div className="mt-6 flex flex-col gap-2 text-sm text-text-muted">

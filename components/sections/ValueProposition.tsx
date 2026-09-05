@@ -16,7 +16,7 @@ const features = [
     icon: "/images/icons/icon-tracking.png",
     title: "Real-Time Tracking",
     description:
-      "Follow your shipment every step of the way — from order placement through rail transit to doorstep delivery.",
+      "Follow your shipment every step of the way, from order placement through rail transit to doorstep delivery.",
   },
   {
     icon: "/images/icons/icon-scheduling.png",
@@ -28,7 +28,7 @@ const features = [
     icon: "/images/icons/icon-hubs.png",
     title: "6 Regional Hubs",
     description:
-      "Covering Colombo, Negombo, Galle, Matara, Jaffna, and Trincomalee — with more cities coming soon.",
+      "Covering Colombo, Negombo, Galle, Matara, Jaffna, and Trincomalee, with more cities coming soon.",
   },
 ];
 

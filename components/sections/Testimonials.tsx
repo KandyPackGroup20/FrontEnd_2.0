@@ -12,7 +12,7 @@ const testimonials = [
     name: "Ashan Perera",
     role: "Supply Chain Manager, Lanka Foods",
     quote:
-      "Kandypack transformed how we distribute products from Kandy. The rail+road hybrid cuts our transit time by 40% compared to road-only freight.",
+      "Kandypack transformed how we distribute products from Kandy. The rail and road hybrid cuts our transit time by 40% compared to road freight.",
   },
   {
     name: "Dilini Fernando",
@@ -30,7 +30,7 @@ const testimonials = [
     name: "Nimesha Silva",
     role: "Founder, Fresh Island Co.",
     quote:
-      "As a small business, reliable logistics was our biggest challenge. Kandypack made it simple — book online, track in real time, delivered on schedule.",
+      "As a small business, reliable logistics was our biggest challenge. Kandypack made it simple: book online, track in real time, delivered on schedule.",
   },
 ];
 
@@ -88,7 +88,7 @@ export default function Testimonials() {
 
         <div className="relative mx-auto max-w-2xl">
           {/* Carousel */}
-          <div className="relative overflow-hidden" style={{ minHeight: 240 }}>
+          <div className="relative w-full overflow-hidden px-1 py-2">
             <AnimatePresence mode="wait" custom={direction}>
               <motion.div
                 key={current}
@@ -101,21 +101,21 @@ export default function Testimonials() {
                   x: { type: "spring", stiffness: 300, damping: 30 },
                   opacity: { duration: 0.3 },
                 }}
-                className="absolute inset-0"
+                className="w-full flex justify-center"
               >
                 <GlassCard
-                  className="flex flex-col items-center p-8 text-center md:p-10"
+                  className="w-full flex flex-col items-center justify-between p-8 text-center md:p-10 min-h-[320px] sm:min-h-[290px]"
                   hover={false}
                 >
-                  <Quote className="mb-4 h-8 w-8 text-green-300" />
-                  <p className="mb-6 text-lg leading-relaxed text-text-body italic">
+                  <Quote className="mb-4 h-8 w-8 text-green-500 shrink-0" />
+                  <p className="mb-6 text-base sm:text-lg leading-relaxed text-text-body italic max-w-xl">
                     &ldquo;{testimonials[current].quote}&rdquo;
                   </p>
-                  <div>
-                    <p className="font-semibold text-text-heading">
+                  <div className="mt-auto pt-2">
+                    <p className="font-bold text-text-heading text-base">
                       {testimonials[current].name}
                     </p>
-                    <p className="text-sm text-text-muted">
+                    <p className="text-sm text-text-muted mt-0.5">
                       {testimonials[current].role}
                     </p>
                   </div>

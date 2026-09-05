@@ -260,13 +260,19 @@ export default function ScrollSequence() {
           className="absolute inset-0 flex flex-col items-center justify-center px-6 pointer-events-none"
           style={{ opacity: taglineOpacity }}
         >
-          <h1 className="text-center text-white drop-shadow-lg">
-            Ship smarter.
+          <h1
+            className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]"
+            style={{ color: "#FFFFFF" }}
+          >
+            <span style={{ color: "#FFFFFF" }}>Ship smarter.</span>
             <br />
-            <span className="text-green-300">Rail to road.</span>
+            <span style={{ color: "#86EFAC" }}>Rail to road.</span>
           </h1>
-          <p className="mt-4 max-w-lg text-center text-lg text-white/80 drop-shadow-md">
-            Sri Lanka&apos;s first hybrid logistics network — from Kandy to your
+          <p
+            className="mt-4 max-w-xl text-center text-lg md:text-xl font-medium drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
+            style={{ color: "#DCFCE7" }}
+          >
+            Sri Lanka&apos;s first hybrid logistics network from Kandy to your
             doorstep via train and truck.
           </p>
         </div>
@@ -274,7 +280,7 @@ export default function ScrollSequence() {
         {/* Screen-reader accessible heading (hidden visually) */}
         <div className="sr-only">
           <h1>
-            Kandypack — Ship smarter with rail to road logistics across Sri Lanka
+            Kandypack: Ship smarter with rail to road logistics across Sri Lanka
           </h1>
         </div>
       </div>
@@ -305,13 +311,19 @@ function HeroFallback() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
-        <h1 className="text-white">
-          Ship smarter.
+        <h1
+          className="text-center drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]"
+          style={{ color: "#FFFFFF" }}
+        >
+          <span style={{ color: "#FFFFFF" }}>Ship smarter.</span>
           <br />
-          <span className="text-green-300">Rail to road.</span>
+          <span style={{ color: "#86EFAC" }}>Rail to road.</span>
         </h1>
-        <p className="mt-4 max-w-lg text-lg text-white/80">
-          Sri Lanka&apos;s first hybrid logistics network — from Kandy to your
+        <p
+          className="mt-4 max-w-xl text-lg md:text-xl font-medium drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
+          style={{ color: "#DCFCE7" }}
+        >
+          Sri Lanka&apos;s first hybrid logistics network from Kandy to your
           doorstep via train and truck.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
