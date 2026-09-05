@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/screenshots/banner.png" alt="Kandypack banner" width="100%" />
-
 # 🚂 KANDYPACK.LK 🚂
+
+<img src="public/images/hero-static-fallback.png" alt="Kandypack banner" width="100%" />
 
 ### Rail & Road Based Supply Chain Distribution System
 
