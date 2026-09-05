@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/screenshots/banner.png" alt="Kandypack banner" width="100%" />
+
 # 🚂 KANDYPACK.LK 🚂
 
 ### Rail & Road Based Supply Chain Distribution System
@@ -12,39 +14,81 @@
 [![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=for-the-badge&logo=greensock&logoColor=white)](https://gsap.com/)
 [![Framer Motion](https://img.shields.io/badge/Framer_Motion-black?style=for-the-badge&logo=framer&logoColor=blue)](https://www.framer.com/motion/)
 
+[![Version](https://img.shields.io/badge/version-2.0-16A34A?style=flat-square)]()
+[![Status](https://img.shields.io/badge/status-in--development-F59E0B?style=flat-square)]()
+
+**[Live Demo](#) · [Design System](./DESIGN.md) · [Report an Issue](../../issues)**
+
 </div>
+
+<br/>
+
+## 📚 Table of Contents
+
+- [About](#-about)
+- [Preview](#-preview)
+- [Highlights](#-highlights)
+- [Tech Stack](#️-tech-stack)
+- [Getting Started](#-getting-started)
+- [Project Structure](#-project-structure)
+- [Design System](#-design-system)
+- [Team](#-team--group-20)
+- [License](#-license)
 
 ---
 
 ## 🌿 About
 
 **Kandypack** replaces a legacy Excel based logistics workflow with a modern,
-database driven distribution platform - shipping FMCG goods from Kandy to six
+database-driven distribution platform shipping FMCG goods from Kandy to six
 regional hubs (**Colombo · Negombo · Galle · Matara · Jaffna · Trincomalee**) by
-train, then completing last-mile delivery by truck.
+train, then completing last mile delivery by truck.
 
-This repository holds the **public customer facing frontend** - the landing
+This repository holds the **public customer facing frontend** the landing
 experience and core customer app (auth, ordering, live tracking, order
 history) built to feel like a premium, modern product, not a legacy
 enterprise tool.
 
-> Built as part of the **CS3043 Database Systems** module project at the
-> CSE batch 24 ,University of Moratuwa - Group 20.
+> 🎓 Built as part of the **CS3043 Database Systems** module project,
+> CSE Batch 24, University of Moratuwa - **Group 20**.
+
+---
+
+## 🎬 Preview
+
+<div align="center">
+
+<img src="docs/screenshots/hero-scroll.gif" alt="Scroll-scrubbed hero sequence" width="90%" />
+
+*The signature scroll scrubbed hero scrolling plays through the shipment's journey like a video*
+
+<br/><br/>
+
+<img src="docs/screenshots/landing-page.png" alt="Landing page" width="45%" />
+<img src="docs/screenshots/order-tracking.png" alt="Live order tracking" width="45%" />
+
+*Landing page (left) · Real time order tracking timeline (right)*
+
+</div>
+
+> 📸 **Note for the team:** drop actual screenshots/GIFs into a `docs/screenshots/`
+> folder at the repo root using the filenames above, and these will render
+> automatically. A short screen recording of the hero scroll effect converted
+> to GIF (via [ScreenToGif](https://www.screentogif.com/) or similar) sells
+> this project hard worth prioritizing over the static screenshots.
 
 ---
 
 ## ✨ Highlights
 
-- 🟢 **Light Green Glass** design system - soft glassmorphism panels floating
-  over animated aurora-gradient backgrounds
-- 🎬 **Scroll scrubbed cinematic hero** - a photo sequence that plays like a
-  video as you scroll, Apple-product-page style
-- 🧊 Consistent glass UI across every surface - nav, cards, forms, modals
-- 🎞️ Motion throughout - staggered scroll reveals, spring hover states,
-  animated count-up stats, animated order-tracking timeline
-- ♿ Full `prefers-reduced-motion` + mobile fallback support - no user is
-  ever stuck loading something they didn't ask for
-- 📱 Fully responsive, mobile first
+| | |
+|---|---|
+| 🟢 **Light Green Glass** design system | Soft glassmorphism panels floating over animated aurora gradient backgrounds |
+| 🎬 **Scroll scrubbed cinematic hero** | A photo sequence that plays like a video as you scroll Apple product page style |
+| 🧊 **Consistent glass UI** | Every surface nav, cards, forms, modals follows one documented component pattern |
+| 🎞️ **Motion throughout** | Staggered scroll reveals, spring hover states, animated count up stats, animated order tracking timeline |
+| ♿ **Accessible by default** | Full `prefers-reduced-motion` + mobile fallback support no one is stuck loading something they didn't ask for |
+| 📱 **Fully responsive** | Mobile-first from the ground up |
 
 ---
 
@@ -57,7 +101,7 @@ enterprise tool.
 | Styling | Tailwind CSS (custom green design tokens) |
 | Animation | Framer Motion (`motion`) + GSAP ScrollTrigger |
 | Smooth Scroll | Lenis |
-| Icons | lucide react |
+| Icons | lucide-react |
 
 The full visual language — colors, glass rules, typography, motion, do's &
 don'ts — lives in [`DESIGN.md`](./DESIGN.md). Any AI coding agent (or human!)
@@ -84,66 +128,3 @@ Open [http://localhost:3000](http://localhost:3000) to view it.
 ---
 
 ## 📁 Project Structure
-
-kandypack-sl/
-├── app/
-│ ├── page.tsx # Landing page
-│ ├── layout.tsx # Root layout
-│ ├── login/ # Auth screens
-│ ├── register/
-│ ├── order/ # Multi-step order flow
-│ ├── orders/ # Order history + live tracking
-│ └── profile/ # Account & saved addresses
-├── components/
-│ ├── hero/ # Scroll-scrubbed sequence hero
-│ ├── sections/ # Landing page sections
-│ └── ui/ # Shared glass UI primitives
-├── public/
-│ └── images/
-│ ├── sequence/ # Hero scroll-sequence frames
-│ └── icons/ # Feature & step icons
-├── DESIGN.md # 🎨 Design system reference
-└── README.md
-
-
----
-
-## 🎨 Design System
-
-This project follows a documented design system rather than ad-hoc styling —
-see [`DESIGN.md`](./DESIGN.md) for the full spec:
-
-- Color tokens & roles
-- Typography scale
-- The `.glass` component pattern
-- Motion language & easing rules
-- Responsive & accessibility behavior
-
----
-
-## 👥 Team — Group 20
-
-| Member | Focus Area |
-|---|---|
-| Gunasekara P.S.I | Identity, Access & Security |
-| Kethmika K.A.D.Y. | Rail Capacity Allocation & Spillover |
-| Praghathees K. | Truck Roster & Driver Assignment Engine |
-| Indrasiri K.B.S.H. | Station Inventory & Warehouse Operations |
-| Sewwandi P.D.Y. | Reporting, Analytics & QA |
-
-*Department of Computer Science & Engineering, University of Moratuwa*
-
----
-
-## 📜 License
-
-This project is built for academic purposes as part of CS3043 — Database
-Systems. All rights reserved by Group 20 unless otherwise stated.
-
----
-
-<div align="center">
-
-**Built with 💚 and a lot of scroll-jank debugging.**
-
-</div>
