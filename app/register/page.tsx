@@ -2,32 +2,38 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, User, Phone, ArrowRight, Train } from "lucide-react";
+import { Mail, Lock, User, Phone, MapPin, Building, ArrowRight, Train, Loader2, AlertCircle } from "lucide-react";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [city, setCity] = useState("Colombo");
+  const [postalCode, setPostalCode] = useState("00100");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    if (!name || !email || !phone || !password || !confirm) {
-      setError("Please fill in all fields.");
+    if (!name || !email || !phone || !addressLine || !city || !password || !confirm) {
+      setError("Please fill in all required fields.");
       return;
     }
     if (!email.includes("@")) {
       setError("Please enter a valid email address.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
       return;
     }
     if (password !== confirm) {
@@ -35,7 +41,41 @@ export default function RegisterPage() {
       return;
     }
 
-    setSuccess(true);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/v1/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          address_line: addressLine,
+          city,
+          postal_code: postalCode,
+          password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Registration failed. Please check your information.");
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        router.push("/orders");
+      }, 1500);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -49,7 +89,7 @@ export default function RegisterPage() {
 
       {/* Floating Glass Box */}
       <motion.div
-        className="relative z-10 w-full max-w-md rounded-3xl p-8 md:p-10 backdrop-blur-2xl bg-white/10 border border-white/20 shadow-[0_16px_50px_rgba(0,0,0,0.5)] ring-1 ring-white/10 text-white"
+        className="relative z-10 w-full max-w-lg rounded-3xl p-8 md:p-10 backdrop-blur-2xl bg-white/10 border border-white/20 shadow-[0_16px_50px_rgba(0,0,0,0.5)] ring-1 ring-white/10 text-white"
         initial={{ opacity: 0, y: 30, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -68,10 +108,10 @@ export default function RegisterPage() {
           className="mb-2 text-center text-2xl md:text-3xl font-bold text-white drop-shadow-sm"
           style={{ color: "#FFFFFF" }}
         >
-          Create your account
+          Create Customer Account
         </h1>
-        <p className="mb-8 text-center text-sm text-green-100/80">
-          Start shipping with rail and road logistics
+        <p className="mb-6 text-center text-sm text-green-100/80">
+          Sign up to manage and track multi-modal freight shipments
         </p>
 
         {success ? (
@@ -80,142 +120,195 @@ export default function RegisterPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <p className="font-semibold text-green-300 text-lg">Account created!</p>
+            <p className="font-semibold text-green-300 text-lg">Account created successfully!</p>
             <p className="mt-1 text-sm text-green-100/90">
-              Welcome to Kandypack. You can now book your first freight shipment.
+              Welcome to Kandypack! Redirecting to your dashboard...
             </p>
-            <div className="mt-4">
-              <Link href="/order/new" className="btn-primary inline-flex text-sm py-2 px-5">
-                Book a Shipment
-              </Link>
-            </div>
           </motion.div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Full Name */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2.5 rounded-xl bg-red-950/60 border border-red-500/30 p-3 text-xs text-red-200"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                <span>{error}</span>
+              </motion.div>
+            )}
+
+            {/* Business / Customer Name */}
             <div>
-              <label htmlFor="register-name" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
-                Full name
+              <label htmlFor="reg-name" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+                Business / Customer Name
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
                 <input
-                  id="register-name"
+                  id="reg-name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-xl bg-white/15 border border-white/25 px-4 py-2.5 pl-10 text-sm text-white placeholder-white/50 backdrop-blur-md outline-none transition-all focus:border-green-400 focus:bg-white/20 focus:ring-2 focus:ring-green-400/30"
-                  placeholder="Sunil Perera"
-                  autoComplete="name"
+                  placeholder="Lanka Wholesalers Ltd"
+                  className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
+                  required
                 />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
               </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label htmlFor="register-email" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
-                <input
-                  id="register-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl bg-white/15 border border-white/25 px-4 py-2.5 pl-10 text-sm text-white placeholder-white/50 backdrop-blur-md outline-none transition-all focus:border-green-400 focus:bg-white/20 focus:ring-2 focus:ring-green-400/30"
-                  placeholder="you@company.com"
-                  autoComplete="email"
-                />
+            {/* Email & Phone grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="reg-email" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+                  Email
+                </label>
+                <div className="relative">
+                  <input
+                    id="reg-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="contact@company.lk"
+                    className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
+                    required
+                  />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="reg-phone" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+                  Phone
+                </label>
+                <div className="relative">
+                  <input
+                    id="reg-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="077 123 4567"
+                    className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
+                    required
+                  />
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+                </div>
               </div>
             </div>
 
-            {/* Phone */}
-            <div>
-              <label htmlFor="register-phone" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
-                Phone number
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
-                <input
-                  id="register-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-xl bg-white/15 border border-white/25 px-4 py-2.5 pl-10 text-sm text-white placeholder-white/50 backdrop-blur-md outline-none transition-all focus:border-green-400 focus:bg-white/20 focus:ring-2 focus:ring-green-400/30"
-                  placeholder="+94 77 123 4567"
-                  autoComplete="tel"
-                />
+            {/* Address & City */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <label htmlFor="reg-address" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+                  Address Line
+                </label>
+                <div className="relative">
+                  <input
+                    id="reg-address"
+                    type="text"
+                    value={addressLine}
+                    onChange={(e) => setAddressLine(e.target.value)}
+                    placeholder="123 Main Street"
+                    className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
+                    required
+                  />
+                  <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="reg-city" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+                  City Hub
+                </label>
+                <div className="relative">
+                  <select
+                    id="reg-city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="w-full rounded-xl bg-white/10 border border-white/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm [&>option]:bg-slate-900"
+                    required
+                  >
+                    <option value="Colombo">Colombo</option>
+                    <option value="Kandy">Kandy</option>
+                    <option value="Galle">Galle</option>
+                    <option value="Negombo">Negombo</option>
+                    <option value="Matara">Matara</option>
+                    <option value="Jaffna">Jaffna</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            {/* Password */}
-            <div>
-              <label htmlFor="register-password" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
-                <input
-                  id="register-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl bg-white/15 border border-white/25 px-4 py-2.5 pl-10 text-sm text-white placeholder-white/50 backdrop-blur-md outline-none transition-all focus:border-green-400 focus:bg-white/20 focus:ring-2 focus:ring-green-400/30"
-                  placeholder="At least 8 characters"
-                  autoComplete="new-password"
-                />
+            {/* Passwords */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="reg-password" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="reg-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
+                    required
+                  />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="reg-confirm" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="reg-confirm"
+                    type="password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
+                    required
+                  />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+                </div>
               </div>
             </div>
 
-            {/* Confirm Password */}
-            <div>
-              <label htmlFor="register-confirm" className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90">
-                Confirm password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
-                <input
-                  id="register-confirm"
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full rounded-xl bg-white/15 border border-white/25 px-4 py-2.5 pl-10 text-sm text-white placeholder-white/50 backdrop-blur-md outline-none transition-all focus:border-green-400 focus:bg-white/20 focus:ring-2 focus:ring-green-400/30"
-                  placeholder="Repeat your password"
-                  autoComplete="new-password"
-                />
-              </div>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <motion.p
-                className="rounded-xl bg-red-500/20 border border-red-500/40 px-4 py-2.5 text-sm text-red-200"
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {error}
-              </motion.p>
-            )}
-
-            {/* Submit */}
+            {/* Submit Button */}
             <button
+              id="register-submit-btn"
               type="submit"
-              className="btn-primary w-full py-3 mt-2 shadow-lg shadow-green-950/40 flex items-center justify-center gap-2"
-              id="register-submit"
+              disabled={loading}
+              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.98] text-white font-semibold py-3 px-4 shadow-lg shadow-green-900/40 transition-all cursor-pointer disabled:opacity-50"
             >
-              Create Account
-              <ArrowRight className="h-4 w-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  Register & Continue
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
         )}
 
-        <p className="mt-6 text-center text-sm text-white/75">
+        <div className="mt-6 text-center text-xs text-white/70">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-green-300 hover:text-green-200 transition-colors">
+          <Link
+            href="/login"
+            className="font-semibold text-green-300 hover:text-green-200 transition-colors underline underline-offset-4"
+          >
             Sign in
           </Link>
-        </p>
+        </div>
       </motion.div>
     </div>
   );
