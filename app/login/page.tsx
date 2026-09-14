@@ -47,16 +47,21 @@ function LoginForm() {
         }),
       });
 
-      const data = await res.json();
+      let data: Record<string, unknown> | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // In case proxy returns plain text 500/502
+      }
 
       if (!res.ok) {
-        throw new Error(data.detail || "Login failed. Please check your credentials.");
+        throw new Error((data?.detail as string) || "Login failed. Please verify that your backend server is running.");
       }
 
       setSuccess(true);
       setTimeout(() => {
-        if (data.force_password_reset) {
-          router.push("/profile?force_reset=true");
+        if (data?.role === "SUPERADMIN" || data?.force_password_reset) {
+          router.push("/profile");
         } else {
           router.push(redirectTarget);
         }
