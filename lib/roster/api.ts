@@ -3,7 +3,10 @@ import type {
   RosterAssignmentCreated,
   RosterAssignmentRequest,
   RosterAssignments,
+  RosterAudit,
+  RosterAuditAttempt,
   RosterCandidates,
+  RosterHours,
   RosterMetadata,
   RosterRoute,
   RosterSession,
@@ -25,6 +28,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isInteger(value) && value >= 0;
 }
 
 function isText(value: unknown): value is string {
@@ -103,6 +114,54 @@ function isCreatedAssignment(value: unknown): value is RosterAssignmentCreated {
   return isRecord(value) && value.status === "SUCCESS" && isText(value.message)
     && (value.result_code === "ROSTER_ASSIGNED" || value.result_code === "ROSTER_ASSIGNMENT_REPLAYED")
     && isAssignment(value.assignment) && isWriteMetadata(value.meta);
+}
+
+function isStaffHours(value: unknown): boolean {
+  return isRecord(value) && isId(value.staff_id)
+    && (value.staff_type === "DRIVER" || value.staff_type === "ASSISTANT")
+    && isNonNegativeInteger(value.scheduled_seconds) && isId(value.limit_seconds)
+    && isInteger(value.remaining_seconds);
+}
+
+function isNullableId(value: unknown): value is number | null {
+  return value === null || isId(value);
+}
+
+function isNullableText(value: unknown): value is string | null {
+  return value === null || isText(value);
+}
+
+function isNullableTimestamp(value: unknown): value is string | null {
+  return value === null || isTimestamp(value);
+}
+
+function isAuditAttempt(value: unknown): value is RosterAuditAttempt {
+  if (!isRecord(value) || !isId(value.audit_id) || !isId(value.actor_id)
+    || !isNullableText(value.actor_name) || !isText(value.outcome)
+    || !isNullableTimestamp(value.occurred_at) || typeof value.legacy !== "boolean") return false;
+  const detailValuesValid = [value.attempted_route_id, value.attempted_truck_id,
+    value.attempted_driver_id, value.attempted_assistant_id, value.assignment_id].every(isNullableId)
+    && isNullableTimestamp(value.attempted_start_time)
+    && isNullableTimestamp(value.attempted_end_time)
+    && (value.attempted_duration_seconds === null || isNonNegativeInteger(value.attempted_duration_seconds))
+    && isNullableText(value.reason_code) && isNullableText(value.policy_id)
+    && isNullableText(value.request_key);
+  if (!detailValuesValid) return false;
+  if (value.legacy) {
+    return [value.attempted_route_id, value.attempted_truck_id, value.attempted_driver_id,
+      value.attempted_assistant_id, value.attempted_start_time, value.attempted_end_time,
+      value.attempted_duration_seconds, value.reason_code, value.policy_id,
+      value.request_key, value.assignment_id].every((item) => item === null);
+  }
+  return [value.attempted_route_id, value.attempted_truck_id, value.attempted_driver_id,
+    value.attempted_assistant_id].every(isId)
+    && isTimestamp(value.attempted_start_time) && isTimestamp(value.attempted_end_time)
+    && isNonNegativeInteger(value.attempted_duration_seconds)
+    && Date.parse(value.attempted_end_time) - Date.parse(value.attempted_start_time)
+      === value.attempted_duration_seconds * 1000
+    && isText(value.policy_id) && isText(value.request_key)
+    && ((value.outcome === "ACCEPTED" && isId(value.assignment_id) && value.reason_code === null)
+      || (value.outcome === "REJECTED" && value.assignment_id === null && isText(value.reason_code)));
 }
 
 function errorMessage(detail: unknown): string | undefined {
@@ -308,4 +367,48 @@ export async function getRosterAssignments(
     ids.add(assignment.roster_id);
   }
   return body as unknown as RosterAssignments;
+}
+
+export async function getRosterHours(weekStart: string, signal: AbortSignal): Promise<RosterHours> {
+  if (!isMonday(weekStart) || Number(weekStart.slice(0, 4)) < 1000) {
+    throw new RangeError("A supported Monday is required for roster hours.");
+  }
+  const query = new URLSearchParams({ week_start: weekStart });
+  const body = await readJson(`/api/v1/roster/hours?${query}`, signal);
+  if (!isRecord(body) || !isWriteMetadata(body.meta)
+    || body.week_start !== weekStart || body.week_end !== shiftRosterWeek(weekStart, 1)
+    || !Array.isArray(body.hours) || !body.hours.every(isStaffHours)) invalidResponse();
+  const keys = new Set<string>();
+  for (const row of body.hours) {
+    const key = `${row.staff_id}:${row.staff_type}`;
+    if (keys.has(key)) invalidResponse();
+    keys.add(key);
+  }
+  return body as unknown as RosterHours;
+}
+
+export async function getRosterAudit(signal: AbortSignal, limit = 50): Promise<RosterAudit> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new RangeError("Audit limit must be an integer from 1 through 100.");
+  }
+  const query = new URLSearchParams({ limit: String(limit) });
+  const body = await readJson(`/api/v1/roster/audit?${query}`, signal);
+  if (!isRecord(body) || !isWriteMetadata(body.meta)
+    || !Array.isArray(body.attempts) || body.attempts.length > limit
+    || !body.attempts.every(isAuditAttempt)) invalidResponse();
+  const ids = new Set<number>();
+  for (let index = 0; index < body.attempts.length; index++) {
+    const attempt = body.attempts[index];
+    const previous = body.attempts[index - 1];
+    if (ids.has(attempt.audit_id)) invalidResponse();
+    ids.add(attempt.audit_id);
+    if (previous) {
+      const previousTime = previous.occurred_at === null ? Number.NEGATIVE_INFINITY : Date.parse(previous.occurred_at);
+      const currentTime = attempt.occurred_at === null ? Number.NEGATIVE_INFINITY : Date.parse(attempt.occurred_at);
+      if (previousTime < currentTime || (previousTime === currentTime && previous.audit_id < attempt.audit_id)) {
+        invalidResponse();
+      }
+    }
+  }
+  return body as unknown as RosterAudit;
 }

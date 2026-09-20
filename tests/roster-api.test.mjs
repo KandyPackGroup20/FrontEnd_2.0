@@ -46,6 +46,35 @@ const createdAssignment = {
   status: "SUCCESS", message: "Roster assignment created.", result_code: "ROSTER_ASSIGNED",
   assignment, meta: mysqlWriteMeta,
 };
+const hours = {
+  week_start: "2026-09-14", week_end: "2026-09-21",
+  hours: [
+    { staff_id: 1, staff_type: "DRIVER", scheduled_seconds: 144000, limit_seconds: 144000, remaining_seconds: 0 },
+    { staff_id: 2, staff_type: "ASSISTANT", scheduled_seconds: 216001, limit_seconds: 216000, remaining_seconds: -1 },
+  ],
+  meta: mysqlWriteMeta,
+};
+const acceptedAudit = {
+  audit_id: 3, actor_id: 10, actor_name: "Dispatcher",
+  attempted_route_id: 1, attempted_truck_id: 1, attempted_driver_id: 1, attempted_assistant_id: 2,
+  attempted_start_time: "2026-09-22T09:00:00+05:30", attempted_end_time: "2026-09-22T10:00:00+05:30",
+  attempted_duration_seconds: 3600, outcome: "ACCEPTED", reason_code: null,
+  policy_id: "demo-v1", request_key: "request-3", assignment_id: 501,
+  occurred_at: "2026-09-20T10:00:00+05:30", legacy: false,
+};
+const rejectedAudit = {
+  ...acceptedAudit, audit_id: 2, outcome: "REJECTED", reason_code: "TRUCK_OVERLAP",
+  request_key: "request-2", assignment_id: null, occurred_at: "2026-09-20T09:00:00+05:30",
+};
+const legacyAudit = {
+  audit_id: 1, actor_id: 10, actor_name: null,
+  attempted_route_id: null, attempted_truck_id: null, attempted_driver_id: null,
+  attempted_assistant_id: null, attempted_start_time: null, attempted_end_time: null,
+  attempted_duration_seconds: null, outcome: "FAILURE", reason_code: null,
+  policy_id: null, request_key: null, assignment_id: null,
+  occurred_at: "2026-09-20T08:00:00+05:30", legacy: true,
+};
+const audit = { attempts: [acceptedAudit, rejectedAudit, legacyAudit], meta: mysqlWriteMeta };
 const signal = () => new AbortController().signal;
 const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "Content-Type": "application/json" },
@@ -369,4 +398,112 @@ test("MySQL service failures preserve explicit causes and make no fallback reque
   }, 503));
   await assert.rejects(api.getRosterCandidates(signal()), { status: 503, code: "ROSTER_DATABASE_UNAVAILABLE" });
   assert.equal(fetchMock.mock.calls.length, 1);
+});
+
+test("selected-week hours use the exact Monday query and strictly parse role totals", async () => {
+  const fetchMock = mock.method(globalThis, "fetch", async () => jsonResponse(hours));
+  const requestSignal = signal();
+  assert.deepEqual(await api.getRosterHours("2026-09-14", requestSignal), hours);
+  const [path, options] = fetchMock.mock.calls[0].arguments;
+  const url = new URL(path, "http://localhost");
+  assert.equal(url.pathname, "/api/v1/roster/hours");
+  assert.equal(url.searchParams.get("week_start"), "2026-09-14");
+  assert.equal(options.credentials, "same-origin");
+  assert.equal(options.cache, "no-store");
+  assert.equal(options.signal, requestSignal);
+  assert.equal(fetchMock.mock.calls.length, 1);
+  await assert.rejects(api.getRosterHours("2026-09-15", requestSignal), RangeError);
+});
+
+test("empty hours remain empty and malformed hours responses fail explicitly", async () => {
+  const bodies = [
+    { ...hours, hours: [] },
+    { ...hours, week_end: "2026-09-22" },
+    { ...hours, meta: mysqlMeta },
+    { ...hours, hours: [{ ...hours.hours[0], scheduled_seconds: 1.5 }] },
+    { ...hours, hours: [{ ...hours.hours[0], remaining_seconds: null }] },
+    { ...hours, hours: [hours.hours[0], { ...hours.hours[0] }] },
+  ];
+  let index = 0;
+  mock.method(globalThis, "fetch", async () => jsonResponse(bodies[index++]));
+  assert.deepEqual((await api.getRosterHours("2026-09-14", signal())).hours, []);
+  for (let bodyIndex = 1; bodyIndex < bodies.length; bodyIndex++) {
+    await assert.rejects(api.getRosterHours("2026-09-14", signal()), {
+      status: 502, code: "INVALID_RESPONSE",
+    });
+  }
+});
+
+test("audit requests the documented limit and parses accepted rejected and legacy entries", async () => {
+  const fetchMock = mock.method(globalThis, "fetch", async () => jsonResponse(audit));
+  const requestSignal = signal();
+  assert.deepEqual(await api.getRosterAudit(requestSignal), audit);
+  const [path, options] = fetchMock.mock.calls[0].arguments;
+  const url = new URL(path, "http://localhost");
+  assert.equal(url.pathname, "/api/v1/roster/audit");
+  assert.equal(url.searchParams.get("limit"), "50");
+  assert.equal(options.signal, requestSignal);
+  assert.equal(fetchMock.mock.calls.length, 1);
+});
+
+test("empty audit stays empty and explicit maximum limit is encoded", async () => {
+  const fetchMock = mock.method(globalThis, "fetch", async () => jsonResponse({ attempts: [], meta: mysqlWriteMeta }));
+  assert.deepEqual((await api.getRosterAudit(signal(), 100)).attempts, []);
+  const url = new URL(fetchMock.mock.calls[0].arguments[0], "http://localhost");
+  assert.equal(url.searchParams.get("limit"), "100");
+  for (const invalid of [0, 101, 1.5, Number.NaN]) {
+    await assert.rejects(api.getRosterAudit(signal(), invalid), RangeError);
+  }
+  assert.equal(fetchMock.mock.calls.length, 1);
+});
+
+test("malformed audit detail legacy consistency and ordering are rejected", async () => {
+  const bodies = [
+    { ...audit, attempts: [{ ...legacyAudit, attempted_route_id: 1 }] },
+    { ...audit, attempts: [{ ...acceptedAudit, reason_code: "CONFLICT" }] },
+    { ...audit, attempts: [{ ...rejectedAudit, assignment_id: 501 }] },
+    { ...audit, attempts: [{ ...acceptedAudit, attempted_start_time: "2026-09-22T09:00:00" }] },
+    { ...audit, attempts: [rejectedAudit, acceptedAudit] },
+    { ...audit, attempts: [acceptedAudit, { ...acceptedAudit }] },
+    { ...audit, attempts: Array.from({ length: 51 }, (_, index) => ({ ...legacyAudit, audit_id: index + 1 })) },
+  ];
+  let index = 0;
+  mock.method(globalThis, "fetch", async () => jsonResponse(bodies[index++]));
+  for (const unused of bodies) {
+    void unused;
+    await assert.rejects(api.getRosterAudit(signal()), { status: 502, code: "INVALID_RESPONSE" });
+  }
+});
+
+test("reporting authentication permission and unavailable responses preserve status and code", async () => {
+  const cases = [
+    { status: 401, code: undefined, detail: "INVALID_TOKEN: Session expired." },
+    { status: 403, code: "PASSWORD_RESET_REQUIRED", detail: { error_code: "PASSWORD_RESET_REQUIRED", message: "Reset required." } },
+    { status: 503, code: "ROSTER_REPORTING_REQUIRES_MYSQL", detail: { error_code: "ROSTER_REPORTING_REQUIRES_MYSQL", message: "Persistent reporting requires MySQL." } },
+  ];
+  let index = 0;
+  const fetchMock = mock.method(globalThis, "fetch", async () => {
+    const item = cases[index++];
+    return jsonResponse({ detail: item.detail }, item.status);
+  });
+  await assert.rejects(api.getRosterHours("2026-09-14", signal()), { status: 401 });
+  await assert.rejects(api.getRosterAudit(signal()), { status: 403, code: "PASSWORD_RESET_REQUIRED" });
+  await assert.rejects(api.getRosterHours("2026-09-14", signal()), { status: 503, code: "ROSTER_REPORTING_REQUIRES_MYSQL" });
+  assert.equal(fetchMock.mock.calls.length, 3);
+});
+
+test("assignment success refreshes all authoritative views without browser policy constants", async () => {
+  const [overview, form, weekly] = await Promise.all([
+    readFile(new URL("../components/roster/RosterOverview.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/roster/AssignmentForm.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/roster/WeeklyHours.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(form, /const result = await createRosterAssignment/);
+  assert.match(form, /await onCreated\(\)/);
+  assert.match(overview, /<AssignmentForm catalog=\{catalog\} onCreated=\{onRefresh\}/);
+  assert.match(overview, /getRosterAssignments\(range, signal\)/);
+  assert.match(overview, /getRosterHours\(weekStart, signal\)/);
+  assert.match(overview, /getRosterAudit\(signal, 50\)/);
+  assert.doesNotMatch(source, /144000|216000/);
+  assert.doesNotMatch(weekly, /144000|216000/);
 });

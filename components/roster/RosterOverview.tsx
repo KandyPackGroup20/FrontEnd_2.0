@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Info, Loader2, RefreshCw, Truck, Users } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
 import AssignmentForm from "@/components/roster/AssignmentForm";
+import AttemptHistory from "@/components/roster/AttemptHistory";
+import WeeklyHours from "@/components/roster/WeeklyHours";
+import type { ReportState } from "@/components/roster/WeeklyHours";
 import {
   currentColomboWeek,
+  getRosterAudit,
   getRosterAssignments,
   getRosterCandidates,
+  getRosterHours,
   getRosterSession,
   initialRosterWeek,
   RosterApiError,
@@ -18,7 +23,9 @@ import {
   shiftRosterWeek,
 } from "@/lib/roster/api";
 import { canAssignRoster, canReadRoster } from "@/lib/roster/types";
-import type { RosterAssignment, RosterCandidates, RosterMetadata, RosterSession } from "@/lib/roster/types";
+import type {
+  RosterAssignment, RosterAudit, RosterCandidates, RosterHours, RosterMetadata, RosterSession,
+} from "@/lib/roster/types";
 
 type ViewState =
   | { kind: "loading" }
@@ -29,6 +36,8 @@ type ViewState =
     session: RosterSession;
     catalog: RosterCandidates;
     assignments: RosterAssignment[];
+    hours: ReportState<RosterHours>;
+    audit: ReportState<RosterAudit>;
     range: { from: string; to: string };
   };
 
@@ -44,11 +53,29 @@ function durationLabel(seconds: number): string {
   return `${Number((seconds / 3600).toFixed(2))} h`;
 }
 
+async function reportState<T>(request: Promise<T>): Promise<ReportState<T>> {
+  try {
+    return { kind: "ready", data: await request };
+  } catch (error: unknown) {
+    if (error instanceof RosterApiError
+      && (error.status === 401 || (error.status === 403 && error.code === "PASSWORD_RESET_REQUIRED"))) {
+      throw error;
+    }
+    return {
+      kind: "error",
+      message: error instanceof RosterApiError
+        ? error.message
+        : "The reporting service could not be reached. Check your connection and retry.",
+    };
+  }
+}
+
 export default function RosterOverview() {
   const router = useRouter();
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<{ weekStart: string; dataSource: RosterMetadata["data_source"] } | null>(null);
+  const auditCache = useRef<ReportState<RosterAudit> | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -72,12 +99,20 @@ export default function RosterOverview() {
         const weekStart = selection?.dataSource === catalog.meta.data_source
           ? selection.weekStart : initialRosterWeek(catalog.meta);
         const range = rosterWeekRange(weekStart);
-        const result = await getRosterAssignments(range, signal);
+        const auditRequest = auditCache.current === null
+          ? reportState(getRosterAudit(signal, 50))
+          : Promise.resolve(auditCache.current);
+        const [result, hours, audit] = await Promise.all([
+          getRosterAssignments(range, signal),
+          reportState(getRosterHours(weekStart, signal)),
+          auditRequest,
+        ]);
         if (signal.aborted) return;
         if (!sameRosterMetadata(result.meta, catalog.meta)) {
           throw new RosterApiError("The roster data changed while loading. Please refresh.", 502);
         }
-        setState({ kind: "ready", session, catalog, assignments: result.assignments, range });
+        auditCache.current = audit;
+        setState({ kind: "ready", session, catalog, assignments: result.assignments, hours, audit, range });
       } catch (error: unknown) {
         if (signal.aborted) return;
         if (error instanceof RosterApiError) {
@@ -108,6 +143,7 @@ export default function RosterOverview() {
   }, [router, attempt, selection]);
 
   function refresh() {
+    auditCache.current = null;
     setState({ kind: "loading" });
     setAttempt((value) => value + 1);
   }
@@ -170,7 +206,7 @@ function RosterData({ state, onSelectWeek, onRefresh }: {
   onSelectWeek: (weekStart: string) => void;
   onRefresh: () => void;
 }) {
-  const { catalog, assignments, range } = state;
+  const { catalog, assignments, hours, audit, range } = state;
   const weekStart = range.from.slice(0, 10);
   const lastDay = new Date(Date.parse(range.to) - 1000);
   const routeById = new Map(catalog.routes.map((route) => [route.route_id, route]));
@@ -258,6 +294,10 @@ function RosterData({ state, onSelectWeek, onRefresh }: {
           </ul>
         )}
       </section>
+
+      <WeeklyHours state={hours} staff={[...catalog.drivers, ...catalog.assistants]} />
+
+      <AttemptHistory state={audit} />
 
       <section aria-labelledby="catalog-title">
         <h2 id="catalog-title" className="text-[clamp(1.5rem,3vw,2rem)]">Roster resources</h2>

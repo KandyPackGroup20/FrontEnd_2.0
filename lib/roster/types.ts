@@ -101,6 +101,46 @@ export interface RosterAssignmentCreated {
   meta: RosterWriteMetadata;
 }
 
+export interface RosterStaffHours {
+  staff_id: number;
+  staff_type: "DRIVER" | "ASSISTANT";
+  scheduled_seconds: number;
+  limit_seconds: number;
+  remaining_seconds: number;
+}
+
+export interface RosterHours {
+  week_start: string;
+  week_end: string;
+  hours: RosterStaffHours[];
+  meta: RosterWriteMetadata;
+}
+
+export interface RosterAuditAttempt {
+  audit_id: number;
+  actor_id: number;
+  actor_name: string | null;
+  attempted_route_id: number | null;
+  attempted_truck_id: number | null;
+  attempted_driver_id: number | null;
+  attempted_assistant_id: number | null;
+  attempted_start_time: string | null;
+  attempted_end_time: string | null;
+  attempted_duration_seconds: number | null;
+  outcome: string;
+  reason_code: string | null;
+  policy_id: string | null;
+  request_key: string | null;
+  assignment_id: number | null;
+  occurred_at: string | null;
+  legacy: boolean;
+}
+
+export interface RosterAudit {
+  attempts: RosterAuditAttempt[];
+  meta: RosterWriteMetadata;
+}
+
 export function canReadRoster(role: string): boolean {
   return ROSTER_READ_ROLES.some((allowed) => allowed === role);
 }
