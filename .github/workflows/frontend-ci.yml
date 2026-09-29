@@ -2,7 +2,7 @@ name: Frontend CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "auth" ]
   pull_request:
     branches: [ "main", "master" ]
 
