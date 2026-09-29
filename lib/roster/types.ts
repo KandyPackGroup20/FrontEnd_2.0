@@ -15,7 +15,7 @@ interface RosterMetadataBase {
 export type RosterMetadata = RosterMetadataBase & (
   | {
     data_source: "dev-memory";
-    policy_id: "demo-v1";
+    policy_id: "kandypack-roster";
     volatile: true;
     fixture_week_start: string;
   }
@@ -86,7 +86,7 @@ export interface RosterAssignmentRequest {
 
 export interface RosterWriteMetadata {
   data_source: "mysql";
-  policy_id: "demo-v1";
+  policy_id: "kandypack-roster";
   policy_confirmed: false;
   timezone: "Asia/Colombo";
   volatile: false;
@@ -120,20 +120,20 @@ export interface RosterAuditAttempt {
   audit_id: number;
   actor_id: number;
   actor_name: string | null;
-  attempted_route_id: number | null;
-  attempted_truck_id: number | null;
-  attempted_driver_id: number | null;
-  attempted_assistant_id: number | null;
-  attempted_start_time: string | null;
-  attempted_end_time: string | null;
-  attempted_duration_seconds: number | null;
-  outcome: string;
-  reason_code: string | null;
-  policy_id: string | null;
-  request_key: string | null;
-  assignment_id: number | null;
-  occurred_at: string | null;
-  legacy: boolean;
+  attempted_route_id: number;
+  attempted_truck_id: number;
+  attempted_driver_id: number;
+  attempted_assistant_id: number;
+  attempted_start_time: string;
+  attempted_end_time: string;
+  attempted_duration_seconds: number;
+  outcome: "ACCEPTED";
+  reason_code: null;
+  policy_id: null;
+  request_key: string;
+  assignment_id: number;
+  occurred_at: string;
+  legacy: false;
 }
 
 export interface RosterAudit {

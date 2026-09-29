@@ -55,8 +55,8 @@ export default function AssignmentForm({ catalog, onCreated }: AssignmentFormPro
     } catch (error: unknown) {
       const rosterError = error instanceof RosterApiError ? error : null;
       setMessage(rosterError?.message ?? (error instanceof Error ? error.message : "Assignment could not be submitted."));
-      // A response is final for this request key. Keep it only after a network
-      // or service failure, where retrying the same request must be safe.
+      // Start a new submission after a definitive rejection; rejected keys are not stored.
+      // Keep the key after network/service failures to recover a committed acceptance.
       if (rosterError && [404, 409, 422].includes(rosterError.status)) requestKey.current = null;
     } finally {
       submittingRef.current = false;

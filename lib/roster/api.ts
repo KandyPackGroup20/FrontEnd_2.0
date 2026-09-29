@@ -67,7 +67,7 @@ function isMetadata(value: unknown): value is RosterMetadata {
       && value.fixture_week_start === null;
   }
   return value.data_source === "dev-memory"
-    && value.policy_id === "demo-v1"
+    && value.policy_id === "kandypack-roster"
     && value.volatile === true
     && isMonday(value.fixture_week_start);
 }
@@ -105,7 +105,7 @@ function isAssignment(value: unknown): value is RosterAssignment {
 }
 
 function isWriteMetadata(value: unknown): value is RosterWriteMetadata {
-  return isRecord(value) && value.data_source === "mysql" && value.policy_id === "demo-v1"
+  return isRecord(value) && value.data_source === "mysql" && value.policy_id === "kandypack-roster"
     && value.policy_confirmed === false && value.timezone === "Asia/Colombo"
     && value.volatile === false && value.fixture_week_start === null;
 }
@@ -123,46 +123,24 @@ function isStaffHours(value: unknown): boolean {
     && isInteger(value.remaining_seconds);
 }
 
-function isNullableId(value: unknown): value is number | null {
-  return value === null || isId(value);
-}
-
 function isNullableText(value: unknown): value is string | null {
   return value === null || isText(value);
 }
 
-function isNullableTimestamp(value: unknown): value is string | null {
-  return value === null || isTimestamp(value);
-}
-
 function isAuditAttempt(value: unknown): value is RosterAuditAttempt {
-  if (!isRecord(value) || !isId(value.audit_id) || !isId(value.actor_id)
-    || !isNullableText(value.actor_name) || !isText(value.outcome)
-    || !isNullableTimestamp(value.occurred_at) || typeof value.legacy !== "boolean") return false;
-  const detailValuesValid = [value.attempted_route_id, value.attempted_truck_id,
-    value.attempted_driver_id, value.attempted_assistant_id, value.assignment_id].every(isNullableId)
-    && isNullableTimestamp(value.attempted_start_time)
-    && isNullableTimestamp(value.attempted_end_time)
-    && (value.attempted_duration_seconds === null || isNonNegativeInteger(value.attempted_duration_seconds))
-    && isNullableText(value.reason_code) && isNullableText(value.policy_id)
-    && isNullableText(value.request_key);
-  if (!detailValuesValid) return false;
-  if (value.legacy) {
-    return [value.attempted_route_id, value.attempted_truck_id, value.attempted_driver_id,
-      value.attempted_assistant_id, value.attempted_start_time, value.attempted_end_time,
-      value.attempted_duration_seconds, value.reason_code, value.policy_id,
-      value.request_key, value.assignment_id].every((item) => item === null);
-  }
-  return [value.attempted_route_id, value.attempted_truck_id, value.attempted_driver_id,
-    value.attempted_assistant_id].every(isId)
+  return isRecord(value) && isId(value.audit_id) && isId(value.actor_id)
+    && isNullableText(value.actor_name) && isTimestamp(value.occurred_at)
+    && value.outcome === "ACCEPTED" && value.legacy === false
+    && [value.attempted_route_id, value.attempted_truck_id, value.attempted_driver_id,
+      value.attempted_assistant_id, value.assignment_id].every(isId)
     && isTimestamp(value.attempted_start_time) && isTimestamp(value.attempted_end_time)
-    && isNonNegativeInteger(value.attempted_duration_seconds)
+    && isNonNegativeInteger(value.attempted_duration_seconds) && value.attempted_duration_seconds > 0
     && Date.parse(value.attempted_end_time) - Date.parse(value.attempted_start_time)
       === value.attempted_duration_seconds * 1000
-    && isText(value.policy_id) && isText(value.request_key)
-    && ((value.outcome === "ACCEPTED" && isId(value.assignment_id) && value.reason_code === null)
-      || (value.outcome === "REJECTED" && value.assignment_id === null && isText(value.reason_code)));
+    && isText(value.request_key) && value.request_key.length <= 128
+    && value.policy_id === null && value.reason_code === null;
 }
+
 
 function errorMessage(detail: unknown): string | undefined {
   if (isText(detail)) return detail;

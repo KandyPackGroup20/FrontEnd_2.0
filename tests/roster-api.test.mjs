@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { afterEach, mock, test } from "node:test";
+import { createRequire } from "node:module";
 import ts from "typescript";
 
 // Exercise the actual TypeScript client without introducing a browser/test dependency.
@@ -13,7 +14,7 @@ const apiModule = `data:text/javascript;base64,${Buffer.from(outputText).toStrin
 const api = await import(apiModule);
 
 const meta = {
-  data_source: "dev-memory", policy_id: "demo-v1", policy_confirmed: false,
+  data_source: "dev-memory", policy_id: "kandypack-roster", policy_confirmed: false,
   timezone: "Asia/Colombo", volatile: true, fixture_week_start: "2026-09-14",
 };
 const candidates = {
@@ -28,7 +29,7 @@ const mysqlMeta = {
   timezone: "Asia/Colombo", volatile: false, fixture_week_start: null,
 };
 const mysqlWriteMeta = {
-  data_source: "mysql", policy_id: "demo-v1", policy_confirmed: false,
+  data_source: "mysql", policy_id: "kandypack-roster", policy_confirmed: false,
   timezone: "Asia/Colombo", volatile: false, fixture_week_start: null,
 };
 const mysqlCandidates = {
@@ -59,7 +60,7 @@ const acceptedAudit = {
   attempted_route_id: 1, attempted_truck_id: 1, attempted_driver_id: 1, attempted_assistant_id: 2,
   attempted_start_time: "2026-09-22T09:00:00+05:30", attempted_end_time: "2026-09-22T10:00:00+05:30",
   attempted_duration_seconds: 3600, outcome: "ACCEPTED", reason_code: null,
-  policy_id: "demo-v1", request_key: "request-3", assignment_id: 501,
+  policy_id: null, request_key: "request-3", assignment_id: 501,
   occurred_at: "2026-09-20T10:00:00+05:30", legacy: false,
 };
 const rejectedAudit = {
@@ -74,7 +75,7 @@ const legacyAudit = {
   policy_id: null, request_key: null, assignment_id: null,
   occurred_at: "2026-09-20T08:00:00+05:30", legacy: true,
 };
-const audit = { attempts: [acceptedAudit, rejectedAudit, legacyAudit], meta: mysqlWriteMeta };
+const audit = { attempts: [acceptedAudit], meta: mysqlWriteMeta };
 const signal = () => new AbortController().signal;
 const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "Content-Type": "application/json" },
@@ -244,7 +245,7 @@ test("MySQL empty catalogs and assignments remain actual empty arrays", async ()
 test("metadata validates each mode without accepting hybrid or missing fields", async () => {
   const invalidMetadata = [
     { ...mysqlMeta, volatile: true },
-    { ...mysqlMeta, policy_id: "demo-v1" },
+    { ...mysqlMeta, policy_id: "kandypack-roster" },
     { ...mysqlMeta, policy_confirmed: true },
     { ...mysqlMeta, fixture_week_start: "2026-09-14" },
     { ...mysqlMeta, fixture_week_start: undefined },
@@ -434,7 +435,7 @@ test("empty hours remain empty and malformed hours responses fail explicitly", a
   }
 });
 
-test("audit requests the documented limit and parses accepted rejected and legacy entries", async () => {
+test("audit requests the documented limit and parses accepted assignments without invented policy history", async () => {
   const fetchMock = mock.method(globalThis, "fetch", async () => jsonResponse(audit));
   const requestSignal = signal();
   assert.deepEqual(await api.getRosterAudit(requestSignal), audit);
@@ -457,15 +458,20 @@ test("empty audit stays empty and explicit maximum limit is encoded", async () =
   assert.equal(fetchMock.mock.calls.length, 1);
 });
 
-test("malformed audit detail legacy consistency and ordering are rejected", async () => {
+test("rejected legacy malformed and unordered audit responses are rejected", async () => {
   const bodies = [
-    { ...audit, attempts: [{ ...legacyAudit, attempted_route_id: 1 }] },
+    { ...audit, attempts: [legacyAudit] },
+    { ...audit, attempts: [rejectedAudit] },
+    { ...audit, attempts: [{ ...acceptedAudit, policy_id: "kandypack-roster" }] },
+    { ...audit, attempts: [{ ...acceptedAudit, attempted_duration_seconds: 3599 }] },
+    { ...audit, attempts: [{ ...acceptedAudit, occurred_at: null }] },
+    { ...audit, attempts: [{ ...acceptedAudit, request_key: null }] },
     { ...audit, attempts: [{ ...acceptedAudit, reason_code: "CONFLICT" }] },
     { ...audit, attempts: [{ ...rejectedAudit, assignment_id: 501 }] },
     { ...audit, attempts: [{ ...acceptedAudit, attempted_start_time: "2026-09-22T09:00:00" }] },
-    { ...audit, attempts: [rejectedAudit, acceptedAudit] },
+    { ...audit, attempts: [{ ...acceptedAudit, audit_id: 2 }, acceptedAudit] },
     { ...audit, attempts: [acceptedAudit, { ...acceptedAudit }] },
-    { ...audit, attempts: Array.from({ length: 51 }, (_, index) => ({ ...legacyAudit, audit_id: index + 1 })) },
+    { ...audit, attempts: Array.from({ length: 51 }, (_, index) => ({ ...acceptedAudit, audit_id: index + 1 })) },
   ];
   let index = 0;
   mock.method(globalThis, "fetch", async () => jsonResponse(bodies[index++]));
@@ -506,4 +512,26 @@ test("assignment success refreshes all authoritative views without browser polic
   assert.match(overview, /getRosterAudit\(signal, 50\)/);
   assert.doesNotMatch(source, /144000|216000/);
   assert.doesNotMatch(weekly, /144000|216000/);
+});
+
+test("accepted history renders saved facts without rejection or historical policy claims", async () => {
+  const componentSource = await readFile(new URL("../components/roster/AttemptHistory.tsx", import.meta.url), "utf8");
+  const compiled = ts.transpileModule(componentSource, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  });
+  const require = createRequire(import.meta.url);
+  const exports = {};
+  new Function("require", "exports", compiled.outputText)(require, exports);
+  const { createElement } = require("react");
+  const { renderToStaticMarkup } = require("react-dom/server");
+  const render = (state) => renderToStaticMarkup(createElement(exports.default, { state }));
+  const ready = render({ kind: "ready", data: audit });
+  assert.match(ready, /Accepted assignment history/);
+  assert.match(ready, /Rejected requests are not saved/);
+  assert.match(ready, /Audit record #3/);
+  assert.match(ready, /Assignment #501/);
+  assert.doesNotMatch(ready, />Policy<|Rejection reason|Legacy record|TRUCK_OVERLAP/);
+  assert.match(render({ kind: "ready", data: { ...audit, attempts: [] } }), /No accepted assignments recorded/);
+  assert.match(render({ kind: "loading" }), /Loading accepted assignment history/);
+  assert.match(render({ kind: "error", message: "Service unavailable" }), /Accepted assignment history unavailable/);
 });
