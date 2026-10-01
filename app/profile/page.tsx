@@ -205,14 +205,11 @@ function ProfileContent() {
         throw new Error(data.detail || "Failed to update password.");
       }
 
-<<<<<<< HEAD
-=======
       if (data.force_password_reset === false) {
         setProfile((current) =>
           current ? { ...current, force_password_reset: false } : current,
         );
       }
->>>>>>> origin/roster-frontend
       setPwSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
