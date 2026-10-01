@@ -60,10 +60,15 @@ export default function RegisterPage() {
         }),
       });
 
-      const data = await res.json();
+      let data: Record<string, unknown> | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // In case proxy returns plain text error
+      }
 
       if (!res.ok) {
-        throw new Error(data.detail || "Registration failed. Please check your information.");
+        throw new Error((data?.detail as string) || "Registration failed. Please make sure the FastAPI backend is running on port 8000.");
       }
 
       setSuccess(true);
