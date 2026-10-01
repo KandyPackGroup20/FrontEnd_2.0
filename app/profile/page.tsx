@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import { canReadRoster } from "@/lib/roster/types";
 
 interface UserProfile {
   user_id: number;
@@ -204,6 +205,14 @@ function ProfileContent() {
         throw new Error(data.detail || "Failed to update password.");
       }
 
+<<<<<<< HEAD
+=======
+      if (data.force_password_reset === false) {
+        setProfile((current) =>
+          current ? { ...current, force_password_reset: false } : current,
+        );
+      }
+>>>>>>> origin/roster-frontend
       setPwSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
@@ -261,6 +270,14 @@ function ProfileContent() {
         </Link>
 
         <div className="flex items-center gap-3">
+          {profile && canReadRoster(profile.role) && !profile.force_password_reset && !isForcedReset && (
+            <Link
+              href="/admin/roster"
+              className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-green-700 transition-colors hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-600"
+            >
+              Truck roster
+            </Link>
+          )}
           <Link
             href="/orders"
             className="text-sm font-semibold text-text-muted hover:text-green-700 transition-colors"
