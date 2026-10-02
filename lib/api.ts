@@ -11,9 +11,26 @@ export class ApiError extends Error {
   }
 }
 
+const TOKEN_KEY = "kandypack_auth_token";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAuthToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
 /**
  * Wraps fetch() so every call:
  *  - sends the kandypack_session login cookie automatically (credentials: "include")
+ *  - attaches Authorization Bearer header if stored
  *  - sends and receives JSON
  *  - throws a readable ApiError on non-2xx responses instead of returning bad data
  */
@@ -21,11 +38,18 @@ export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const token = getAuthToken();
+  const authHeaders: Record<string, string> = {};
+  if (token) {
+    authHeaders["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders,
       ...(options.headers || {}),
     },
   });

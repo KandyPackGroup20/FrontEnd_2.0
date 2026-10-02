@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Train, Package, Calendar, History } from "lucide-react";
+import { Train, Package, Calendar, History, Shield } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
@@ -64,6 +64,18 @@ export default function WarehousePage() {
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<Banner>(null);
 
+  // Active Viva Operator (RBAC Session Switcher)
+  const [operator, setOperator] = useState<{
+    name: string;
+    role: "STORE_MGR" | "WAREHOUSE_STAFF";
+    email: string;
+  }>({
+    name: "Sunil (Colombo Store Manager)",
+    role: "STORE_MGR",
+    email: "store.colombo@kandypack.lk",
+  });
+  const [switchingOperator, setSwitchingOperator] = useState(false);
+
   // Receive a manifest
   const [receivingTripId, setReceivingTripId] = useState<number | null>(null);
 
@@ -79,8 +91,6 @@ export default function WarehousePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Fetches stock + manifests for the chosen station.
-  // Stock is required. Manifests are optional: Warehouse Staff may view stock
-  // but only Store Managers may view manifests, so a 403 there is not fatal.
   const fetchStationData = useCallback(async (id: number) => {
     const [stockResult, manifestResult] = await Promise.allSettled([
       apiFetch<{ inventory: StockRow[] }>(`/inventory/?station_id=${id}`),
@@ -104,7 +114,42 @@ export default function WarehousePage() {
     }
   }, []);
 
-  // Load data whenever the station changes.
+  const switchOperator = useCallback(
+    async (role: "STORE_MGR" | "WAREHOUSE_STAFF") => {
+      setSwitchingOperator(true);
+      try {
+        const email =
+          role === "STORE_MGR"
+            ? "store.colombo@kandypack.lk"
+            : "wh.staff1@kandypack.lk";
+        const name =
+          role === "STORE_MGR"
+            ? "Sunil (Colombo Store Manager)"
+            : "Kamal (Warehouse Staff)";
+        await apiFetch("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email,
+            password: "password123",
+            portal_type: "admin",
+          }),
+        });
+        setOperator({ name, role, email });
+        setBanner({
+          type: "success",
+          text: `Switched session to ${name} (${role}). Permissions updated!`,
+        });
+        await fetchStationData(stationId);
+      } catch (err) {
+        setBanner({ type: "error", text: describeError(err) });
+      } finally {
+        setSwitchingOperator(false);
+      }
+    },
+    [stationId, fetchStationData]
+  );
+
+  // Load data whenever the station changes; auto-authenticate if needed
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -112,6 +157,12 @@ export default function WarehousePage() {
         await fetchStationData(stationId);
         if (!cancelled) setBanner(null);
       } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          try {
+            await switchOperator("STORE_MGR");
+            return;
+          } catch {}
+        }
         if (!cancelled) setBanner({ type: "error", text: describeError(err) });
       } finally {
         if (!cancelled) setLoading(false);
@@ -120,7 +171,8 @@ export default function WarehousePage() {
     return () => {
       cancelled = true;
     };
-  }, [stationId, fetchStationData]);
+  }, [stationId, fetchStationData, switchOperator]);
+
 
   function handleStationChange(id: number) {
     setLoading(true);
@@ -239,6 +291,51 @@ export default function WarehousePage() {
       </div>
 
       <div className="relative mx-auto max-w-6xl">
+        {/* Viva RBAC Operator Switcher Bar */}
+        <div className="glass-sm mb-6 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-green-200/50">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 text-green-700">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-green-700 flex items-center gap-1.5">
+                Active Viva Session • <span className="underline">{operator.role}</span>
+              </div>
+              <div className="text-sm font-bold text-text-heading">
+                {operator.name} <span className="text-xs font-normal text-text-muted">({operator.email})</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-muted hidden md:inline">Switch Role:</span>
+            <button
+              type="button"
+              onClick={() => switchOperator("STORE_MGR")}
+              disabled={switchingOperator || operator.role === "STORE_MGR"}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                operator.role === "STORE_MGR"
+                  ? "bg-green-600 text-white shadow-sm"
+                  : "bg-white/70 hover:bg-green-50 text-text-body border border-green-200"
+              }`}
+            >
+              Store Manager
+            </button>
+            <button
+              type="button"
+              onClick={() => switchOperator("WAREHOUSE_STAFF")}
+              disabled={switchingOperator || operator.role === "WAREHOUSE_STAFF"}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                operator.role === "WAREHOUSE_STAFF"
+                  ? "bg-green-600 text-white shadow-sm"
+                  : "bg-white/70 hover:bg-green-50 text-text-body border border-green-200"
+              }`}
+            >
+              Warehouse Staff
+            </button>
+          </div>
+        </div>
+
         {/* Title + station picker */}
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
