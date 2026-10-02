@@ -15,11 +15,12 @@ import {
   Layers,
   AlertTriangle,
   BarChart3,
+  LogOut,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
-import { apiFetch, describeError, ApiError } from "@/lib/api";
+import { apiFetch, describeError, ApiError, getAuthToken, setAuthToken } from "@/lib/api";
 
 // These ids match station_store in the database (06_seed_data.sql).
 const STATIONS = [
@@ -214,26 +215,18 @@ export default function WarehousePage() {
     async (role: "STORE_MGR" | "WAREHOUSE_STAFF") => {
       setSwitchingOperator(true);
       try {
-        const email =
-          role === "STORE_MGR"
-            ? "store.colombo@kandypack.lk"
-            : "wh.staff1@kandypack.lk";
-        const name =
-          role === "STORE_MGR"
-            ? "Sunil (Colombo Store Manager)"
-            : "Kamal (Warehouse Staff)";
-        await apiFetch("/auth/login", {
+        const res = await apiFetch<{
+          access_token: string;
+          user: { name: string; role: "STORE_MGR" | "WAREHOUSE_STAFF"; email: string };
+        }>("/inventory/session", {
           method: "POST",
-          body: JSON.stringify({
-            email,
-            password: "password123",
-            portal_type: "admin",
-          }),
+          body: JSON.stringify({ role }),
         });
-        setOperator({ name, role, email });
-        setBanner({
-          type: "success",
-          text: `Switched session to ${name} (${role}). Permissions updated!`,
+        setAuthToken(res.access_token);
+        setOperator({
+          name: res.user.name,
+          role: res.user.role,
+          email: res.user.email,
         });
         await fetchStationData(stationId);
       } catch (err) {
@@ -245,20 +238,30 @@ export default function WarehousePage() {
     [stationId, fetchStationData]
   );
 
-  // Load data whenever the station changes; auto-authenticate if needed
+  // Load data whenever the station changes; auto-authenticate default session
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        // Ensure fresh session token matching active operator
+        const res = await apiFetch<{
+          access_token: string;
+          user: { name: string; role: "STORE_MGR" | "WAREHOUSE_STAFF"; email: string };
+        }>("/inventory/session", {
+          method: "POST",
+          body: JSON.stringify({ role: operator.role }),
+        });
+        setAuthToken(res.access_token);
+        if (!cancelled) {
+          setOperator({
+            name: res.user.name,
+            role: res.user.role,
+            email: res.user.email,
+          });
+        }
         await fetchStationData(stationId);
         if (!cancelled) setBanner(null);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          try {
-            await switchOperator("STORE_MGR");
-            return;
-          } catch {}
-        }
         if (!cancelled) setBanner({ type: "error", text: describeError(err) });
       } finally {
         if (!cancelled) setLoading(false);
@@ -267,7 +270,7 @@ export default function WarehousePage() {
     return () => {
       cancelled = true;
     };
-  }, [stationId, fetchStationData, switchOperator]);
+  }, [stationId, fetchStationData]);
 
 
   function handleStationChange(id: number) {
@@ -451,15 +454,19 @@ export default function WarehousePage() {
       </div>
 
       <div className="relative mx-auto max-w-6xl">
-        {/* Viva RBAC Operator Switcher Bar */}
+        {/* Authenticated Employee Profile Bar */}
         <div className="glass-sm mb-6 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-green-200/50">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 text-green-700">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 text-green-700">
               <Shield className="h-5 w-5" />
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-green-700 flex items-center gap-1.5">
-                Active Viva Session • <span className="underline">{operator.role}</span>
+                <span>Active Portal Session</span>
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span className="font-bold text-green-800">
+                  {operator.role === "STORE_MGR" ? "Store Manager" : "Warehouse Staff"}
+                </span>
               </div>
               <div className="text-sm font-bold text-text-heading">
                 {operator.name} <span className="text-xs font-normal text-text-muted">({operator.email})</span>
@@ -467,31 +474,46 @@ export default function WarehousePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-text-muted hidden md:inline">Switch Role:</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-white/80 p-1 rounded-xl border border-green-200 shadow-xs">
+              <button
+                type="button"
+                onClick={() => switchOperator("STORE_MGR")}
+                disabled={switchingOperator || operator.role === "STORE_MGR"}
+                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                  operator.role === "STORE_MGR"
+                    ? "bg-green-600 text-white shadow-xs"
+                    : "text-text-muted hover:text-text-heading hover:bg-green-50"
+                }`}
+              >
+                Store Manager
+              </button>
+              <button
+                type="button"
+                onClick={() => switchOperator("WAREHOUSE_STAFF")}
+                disabled={switchingOperator || operator.role === "WAREHOUSE_STAFF"}
+                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                  operator.role === "WAREHOUSE_STAFF"
+                    ? "bg-green-600 text-white shadow-xs"
+                    : "text-text-muted hover:text-text-heading hover:bg-green-50"
+                }`}
+              >
+                Warehouse Staff
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={() => switchOperator("STORE_MGR")}
-              disabled={switchingOperator || operator.role === "STORE_MGR"}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                operator.role === "STORE_MGR"
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "bg-white/70 hover:bg-green-50 text-text-body border border-green-200"
-              }`}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  localStorage.removeItem("kandypack_auth_token");
+                  window.location.href = "/login";
+                }
+              }}
+              className="text-xs px-3.5 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              Store Manager
-            </button>
-            <button
-              type="button"
-              onClick={() => switchOperator("WAREHOUSE_STAFF")}
-              disabled={switchingOperator || operator.role === "WAREHOUSE_STAFF"}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                operator.role === "WAREHOUSE_STAFF"
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "bg-white/70 hover:bg-green-50 text-text-body border border-green-200"
-              }`}
-            >
-              Warehouse Staff
+              <LogOut className="h-3.5 w-3.5" />
+              Sign Out
             </button>
           </div>
         </div>
@@ -545,7 +567,7 @@ export default function WarehousePage() {
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-green-600" />
                 <h2 id="report-summary-title" className="text-base font-bold text-text-heading">
-                  Station Store Operations &amp; Stock Value (Report #6)
+                  Station Inventory &amp; Operations Overview
                 </h2>
               </div>
               <button
@@ -618,7 +640,7 @@ export default function WarehousePage() {
               <div className="glass p-4 border border-green-200">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted">
-                    Station Adjustment Breakdown (View: v_stock_adjustment_summary)
+                    Stock Adjustment &amp; Discrepancy Breakdown
                   </h3>
                   <span className="text-xs text-text-muted">
                     {summaryReport.breakdown.length} discrepancy records
@@ -681,124 +703,124 @@ export default function WarehousePage() {
               Incoming Train Manifests
             </h2>
 
-            {loading && <p className="text-sm text-text-muted">Loading...</p>}
-            {!loading && manifestsNote && (
-              <p className="text-sm text-text-muted">{manifestsNote}</p>
-            )}
-            {!loading && !manifestsNote && manifests.length === 0 && (
-              <p className="text-sm text-text-muted">No manifests for this station yet.</p>
-            )}
+              {loading && <p className="text-sm text-text-muted">Loading...</p>}
+              {!loading && manifestsNote && (
+                <p className="text-sm text-text-muted">{manifestsNote}</p>
+              )}
+              {!loading && !manifestsNote && manifests.length === 0 && (
+                <p className="text-sm text-text-muted">No manifests for this station yet.</p>
+              )}
 
-            <ul className="space-y-3">
-              {manifests.map((m) => {
-                const isExpanded = expandedTripId === m.trip_id;
-                const items = cargoItems[m.trip_id] || [];
-                const isLoadingCargo = loadingCargoTripId === m.trip_id;
+              <ul className="space-y-3">
+                {manifests.map((m) => {
+                  const isExpanded = expandedTripId === m.trip_id;
+                  const items = cargoItems[m.trip_id] || [];
+                  const isLoadingCargo = loadingCargoTripId === m.trip_id;
 
-                return (
-                  <li
-                    key={m.manifest_id}
-                    className="glass-sm p-4 transition-all"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 text-sm font-semibold text-text-heading">
-                          <Train className="h-4 w-4 text-green-600" />
-                          Trip #{m.trip_id} from Kandy
-                        </div>
-                        <div className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {m.departure_datetime} to {m.arrival_datetime}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleCargoPreview(m.trip_id)}
-                          className="text-xs px-2.5 py-1.5 rounded-lg border border-green-200 hover:bg-green-50 text-green-700 font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          ) : (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          )}
-                          {isExpanded ? "Hide Cargo" : "Inspect Cargo"}
-                        </button>
-
-                        <StatusPill
-                          status={m.manifest_status === "RECEIVED" ? "delivered" : "pending"}
-                          label={m.manifest_status === "RECEIVED" ? "Received" : "Pending"}
-                        />
-                        {m.manifest_status === "PENDING" && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleReceive(m.trip_id)}
-                            disabled={receivingTripId === m.trip_id}
-                          >
-                            {receivingTripId === m.trip_id ? "Receiving..." : "Receive"}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Collapsible Cargo Items Preview */}
-                    {isExpanded && (
-                      <div className="mt-3 pt-3 border-t border-green-100 text-xs">
-                        <div className="font-semibold text-text-heading mb-2 flex items-center justify-between">
-                          <span>Allocated Train Cargo (Order Items):</span>
-                          {items.length > 0 && (
-                            <span className="text-text-muted font-normal">
-                              Total Space:{" "}
-                              {items
-                                .reduce((acc, it) => acc + Number(it.allocated_space), 0)
-                                .toFixed(2)}{" "}
-                              m³
-                            </span>
-                          )}
-                        </div>
-
-                        {isLoadingCargo && <p className="text-text-muted">Loading cargo items...</p>}
-                        {!isLoadingCargo && items.length === 0 && (
-                          <p className="text-text-muted italic">No items allocated to this train trip.</p>
-                        )}
-                        {!isLoadingCargo && items.length > 0 && (
-                          <div className="space-y-1.5 bg-white/60 rounded-xl p-2.5 border border-green-100">
-                            {items.map((it) => (
-                              <div
-                                key={it.order_item_id}
-                                className="flex justify-between items-center text-text-body"
-                              >
-                                <div>
-                                  <span className="font-medium">{it.product_name}</span>
-                                  <span className="text-text-muted ml-1.5 text-[11px]">
-                                    (Order #{it.order_id})
-                                  </span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="font-bold text-green-700">
-                                    {it.allocated_quantity} units
-                                  </span>
-                                  <span className="text-text-muted ml-2 text-[11px]">
-                                    ({it.allocated_space} m³)
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
+                  return (
+                    <li
+                      key={m.manifest_id}
+                      className="glass-sm p-4 transition-all"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-semibold text-text-heading">
+                            <Train className="h-4 w-4 text-green-600" />
+                            Trip #{m.trip_id} from Kandy
                           </div>
-                        )}
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {m.departure_datetime} to {m.arrival_datetime}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleCargoPreview(m.trip_id)}
+                            className="text-xs px-2.5 py-1.5 rounded-lg border border-green-200 hover:bg-green-50 text-green-700 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                            {isExpanded ? "Hide Cargo" : "Inspect Cargo"}
+                          </button>
+
+                          <StatusPill
+                            status={m.manifest_status === "RECEIVED" ? "delivered" : "pending"}
+                            label={m.manifest_status === "RECEIVED" ? "Received" : "Pending"}
+                          />
+                          {m.manifest_status === "PENDING" && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleReceive(m.trip_id)}
+                              disabled={receivingTripId === m.trip_id}
+                            >
+                              {receivingTripId === m.trip_id ? "Receiving..." : "Receive"}
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+
+                      {/* Collapsible Cargo Items Preview */}
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-green-100 text-xs">
+                          <div className="font-semibold text-text-heading mb-2 flex items-center justify-between">
+                            <span>Allocated Train Cargo (Order Items):</span>
+                            {items.length > 0 && (
+                              <span className="text-text-muted font-normal">
+                                Total Space:{" "}
+                                {items
+                                  .reduce((acc, it) => acc + Number(it.allocated_space), 0)
+                                  .toFixed(2)}{" "}
+                                m³
+                              </span>
+                            )}
+                          </div>
+
+                          {isLoadingCargo && <p className="text-text-muted">Loading cargo items...</p>}
+                          {!isLoadingCargo && items.length === 0 && (
+                            <p className="text-text-muted italic">No items allocated to this train trip.</p>
+                          )}
+                          {!isLoadingCargo && items.length > 0 && (
+                            <div className="space-y-1.5 bg-white/60 rounded-xl p-2.5 border border-green-100">
+                              {items.map((it) => (
+                                <div
+                                  key={it.order_item_id}
+                                  className="flex justify-between items-center text-text-body"
+                                >
+                                  <div>
+                                    <span className="font-medium">{it.product_name}</span>
+                                    <span className="text-text-muted ml-1.5 text-[11px]">
+                                      (Order #{it.order_id})
+                                    </span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="font-bold text-green-700">
+                                      {it.allocated_quantity} units
+                                    </span>
+                                    <span className="text-text-muted ml-2 text-[11px]">
+                                      ({it.allocated_space} m³)
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
 
           {/* Station stock */}
           <section className="glass p-6" aria-labelledby="stock-title">
             <h2 id="stock-title" className="mb-4 text-lg font-semibold text-text-heading">
-              Station Stock
+              Station Stock &amp; Storage Bins
             </h2>
 
             {loading && <p className="text-sm text-text-muted">Loading...</p>}
