@@ -650,10 +650,14 @@ function ProfileContent() {
                 )}
 
                 <div className="pt-2">
-                  <Button variant="primary" size="md" disabled={saveLoading}>
+                  <button
+                    type="submit"
+                    disabled={saveLoading}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white font-semibold py-2.5 px-6 text-sm shadow-md shadow-green-900/10 transition-all cursor-pointer disabled:opacity-50"
+                  >
                     {saveLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
                     Save Profile Details
-                  </Button>
+                  </button>
                 </div>
               </form>
             </div>
