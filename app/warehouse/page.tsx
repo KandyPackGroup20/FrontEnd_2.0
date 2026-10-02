@@ -786,9 +786,9 @@ export default function WarehousePage() {
                           )}
                           {!isLoadingCargo && items.length > 0 && (
                             <div className="space-y-1.5 bg-white/60 rounded-xl p-2.5 border border-green-100">
-                              {items.map((it) => (
+                              {items.map((it, idx) => (
                                 <div
-                                  key={it.order_item_id}
+                                  key={`cargo-${it.trip_id}-${it.order_item_id}-${idx}`}
                                   className="flex justify-between items-center text-text-body"
                                 >
                                   <div>
