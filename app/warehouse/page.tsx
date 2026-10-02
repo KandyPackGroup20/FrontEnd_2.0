@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Train, Package, Calendar, History, Shield } from "lucide-react";
+import { Train, Package, Calendar, History, Shield, ChevronDown, ChevronUp, MapPin } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
@@ -45,6 +45,24 @@ type ManifestRow = {
   received_at: string | null;
 };
 
+type CargoItem = {
+  trip_id: number;
+  order_item_id: number;
+  order_id: number;
+  product_id: number;
+  product_name: string;
+  allocated_quantity: number;
+  allocated_space: number;
+  space_consumption_rate: number;
+};
+
+type BinOption = {
+  location_id: number;
+  station_id: number;
+  location_code: string;
+  location_type: string;
+};
+
 type AdjustmentRow = {
   adjustment_id: number;
   inventory_id: number;
@@ -63,6 +81,16 @@ export default function WarehousePage() {
   const [manifestsNote, setManifestsNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<Banner>(null);
+
+  // Train Cargo preview state
+  const [expandedTripId, setExpandedTripId] = useState<number | null>(null);
+  const [cargoItems, setCargoItems] = useState<Record<number, CargoItem[]>>({});
+  const [loadingCargoTripId, setLoadingCargoTripId] = useState<number | null>(null);
+
+  // Available bins and editing state (FR-4.4.6)
+  const [availableBins, setAvailableBins] = useState<BinOption[]>([]);
+  const [editingBinInvId, setEditingBinInvId] = useState<number | null>(null);
+  const [assigningBin, setAssigningBin] = useState(false);
 
   // Active Viva Operator (RBAC Session Switcher)
   const [operator, setOperator] = useState<{
@@ -90,11 +118,12 @@ export default function WarehousePage() {
   const [history, setHistory] = useState<AdjustmentRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Fetches stock + manifests for the chosen station.
+  // Fetches stock + manifests + available bins for the chosen station.
   const fetchStationData = useCallback(async (id: number) => {
-    const [stockResult, manifestResult] = await Promise.allSettled([
+    const [stockResult, manifestResult, binsResult] = await Promise.allSettled([
       apiFetch<{ inventory: StockRow[] }>(`/inventory/?station_id=${id}`),
       apiFetch<{ manifests: ManifestRow[] }>(`/inventory/manifests?station_id=${id}`),
+      apiFetch<{ bins: BinOption[] }>(`/inventory/bins?station_id=${id}`),
     ]);
 
     if (stockResult.status === "rejected") throw stockResult.reason;
@@ -112,7 +141,12 @@ export default function WarehousePage() {
           : describeError(reason)
       );
     }
+
+    if (binsResult.status === "fulfilled") {
+      setAvailableBins(binsResult.value.bins);
+    }
   }, []);
+
 
   const switchOperator = useCallback(
     async (role: "STORE_MGR" | "WAREHOUSE_STAFF") => {
@@ -186,6 +220,55 @@ export default function WarehousePage() {
       await fetchStationData(stationId);
     } catch (err) {
       setBanner({ type: "error", text: describeError(err) });
+    }
+  }
+
+  async function toggleCargoPreview(tripId: number) {
+    if (expandedTripId === tripId) {
+      setExpandedTripId(null);
+      return;
+    }
+    setExpandedTripId(tripId);
+    if (!cargoItems[tripId]) {
+      setLoadingCargoTripId(tripId);
+      try {
+        const res = await apiFetch<{ items: CargoItem[] }>(
+          `/inventory/manifests/${tripId}/items`
+        );
+        setCargoItems((prev) => ({ ...prev, [tripId]: res.items }));
+      } catch (err) {
+        setBanner({ type: "error", text: describeError(err) });
+      } finally {
+        setLoadingCargoTripId(null);
+      }
+    }
+  }
+
+  async function handleAssignBin(inventoryId: number, locationId: number | null) {
+    setAssigningBin(true);
+    setBanner(null);
+    try {
+      const res = await apiFetch<{ message: string; inventory: StockRow }>(
+        `/inventory/${inventoryId}/bin`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ location_id: locationId }),
+        }
+      );
+      setStock((prev) =>
+        prev.map((row) =>
+          row.inventory_id === inventoryId ? { ...row, ...res.inventory } : row
+        )
+      );
+      setEditingBinInvId(null);
+      setBanner({
+        type: "success",
+        text: `Bin location updated successfully!`,
+      });
+    } catch (err) {
+      setBanner({ type: "error", text: describeError(err) });
+    } finally {
+      setAssigningBin(false);
     }
   }
 
@@ -394,39 +477,108 @@ export default function WarehousePage() {
             )}
 
             <ul className="space-y-3">
-              {manifests.map((m) => (
-                <li
-                  key={m.manifest_id}
-                  className="glass-sm flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-text-heading">
-                      <Train className="h-4 w-4 text-green-600" />
-                      Trip #{m.trip_id} from Kandy
-                    </div>
-                    <div className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {m.departure_datetime} to {m.arrival_datetime}
-                    </div>
-                  </div>
+              {manifests.map((m) => {
+                const isExpanded = expandedTripId === m.trip_id;
+                const items = cargoItems[m.trip_id] || [];
+                const isLoadingCargo = loadingCargoTripId === m.trip_id;
 
-                  <div className="flex items-center gap-3">
-                    <StatusPill
-                      status={m.manifest_status === "RECEIVED" ? "delivered" : "pending"}
-                      label={m.manifest_status === "RECEIVED" ? "Received" : "Pending"}
-                    />
-                    {m.manifest_status === "PENDING" && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleReceive(m.trip_id)}
-                        disabled={receivingTripId === m.trip_id}
-                      >
-                        {receivingTripId === m.trip_id ? "Receiving..." : "Receive"}
-                      </Button>
+                return (
+                  <li
+                    key={m.manifest_id}
+                    className="glass-sm p-4 transition-all"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-text-heading">
+                          <Train className="h-4 w-4 text-green-600" />
+                          Trip #{m.trip_id} from Kandy
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {m.departure_datetime} to {m.arrival_datetime}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleCargoPreview(m.trip_id)}
+                          className="text-xs px-2.5 py-1.5 rounded-lg border border-green-200 hover:bg-green-50 text-green-700 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          )}
+                          {isExpanded ? "Hide Cargo" : "Inspect Cargo"}
+                        </button>
+
+                        <StatusPill
+                          status={m.manifest_status === "RECEIVED" ? "delivered" : "pending"}
+                          label={m.manifest_status === "RECEIVED" ? "Received" : "Pending"}
+                        />
+                        {m.manifest_status === "PENDING" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleReceive(m.trip_id)}
+                            disabled={receivingTripId === m.trip_id}
+                          >
+                            {receivingTripId === m.trip_id ? "Receiving..." : "Receive"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Collapsible Cargo Items Preview */}
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t border-green-100 text-xs">
+                        <div className="font-semibold text-text-heading mb-2 flex items-center justify-between">
+                          <span>Allocated Train Cargo (Order Items):</span>
+                          {items.length > 0 && (
+                            <span className="text-text-muted font-normal">
+                              Total Space:{" "}
+                              {items
+                                .reduce((acc, it) => acc + Number(it.allocated_space), 0)
+                                .toFixed(2)}{" "}
+                              m³
+                            </span>
+                          )}
+                        </div>
+
+                        {isLoadingCargo && <p className="text-text-muted">Loading cargo items...</p>}
+                        {!isLoadingCargo && items.length === 0 && (
+                          <p className="text-text-muted italic">No items allocated to this train trip.</p>
+                        )}
+                        {!isLoadingCargo && items.length > 0 && (
+                          <div className="space-y-1.5 bg-white/60 rounded-xl p-2.5 border border-green-100">
+                            {items.map((it) => (
+                              <div
+                                key={it.order_item_id}
+                                className="flex justify-between items-center text-text-body"
+                              >
+                                <div>
+                                  <span className="font-medium">{it.product_name}</span>
+                                  <span className="text-text-muted ml-1.5 text-[11px]">
+                                    (Order #{it.order_id})
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-bold text-green-700">
+                                    {it.allocated_quantity} units
+                                  </span>
+                                  <span className="text-text-muted ml-2 text-[11px]">
+                                    ({it.allocated_space} m³)
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </section>
 
@@ -453,8 +605,61 @@ export default function WarehousePage() {
                         <div className="text-sm font-semibold text-text-heading">
                           {row.product_name}
                         </div>
-                        <div className="text-xs text-text-muted">
-                          Bin: {row.bin_code ?? "Not yet binned"}
+                        <div className="text-xs text-text-muted flex items-center gap-1.5 mt-0.5">
+                          <MapPin className="h-3 w-3 text-green-600" />
+                          <span>Bin:</span>
+                          {editingBinInvId === row.inventory_id ? (
+                            <div className="flex items-center gap-1">
+                              <select
+                                className="text-xs py-0.5 px-1.5 rounded border border-green-400 bg-white"
+                                defaultValue={
+                                  row.bin_code
+                                    ? availableBins.find((b) => b.location_code === row.bin_code)?.location_id ?? ""
+                                    : ""
+                                }
+                                onChange={(e) =>
+                                  handleAssignBin(
+                                    row.inventory_id,
+                                    e.target.value ? Number(e.target.value) : null
+                                  )
+                                }
+                                disabled={assigningBin}
+                              >
+                                <option value="">-- No Bin (Unbind) --</option>
+                                {availableBins.map((b) => (
+                                  <option key={b.location_id} value={b.location_id}>
+                                    {b.location_code} ({b.location_type})
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => setEditingBinInvId(null)}
+                                className="text-[11px] text-text-muted hover:text-text-heading px-1 cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`font-medium px-1.5 py-0.5 rounded text-[11px] ${
+                                  row.bin_code
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {row.bin_code ?? "Unassigned"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setEditingBinInvId(row.inventory_id)}
+                                className="text-[11px] text-green-600 hover:text-green-700 underline font-medium cursor-pointer"
+                              >
+                                {row.bin_code ? "Change" : "Assign Bin"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
