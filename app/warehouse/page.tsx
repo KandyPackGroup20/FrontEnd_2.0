@@ -2,7 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Train, Package, Calendar, History, Shield, ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import {
+  Train,
+  Package,
+  Calendar,
+  History,
+  Shield,
+  ChevronDown,
+  ChevronUp,
+  MapPin,
+  DollarSign,
+  Layers,
+  AlertTriangle,
+  BarChart3,
+} from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
@@ -17,6 +30,16 @@ const STATIONS = [
   { id: 5, name: "Jaffna" },
   { id: 6, name: "Trincomalee" },
   { id: 7, name: "Kandy" },
+];
+
+const STANDARD_REASONS = [
+  "Damaged during unloading - crushed carton",
+  "Missing item - short shipment from train",
+  "Water / moisture damage in storage",
+  "Quality rejection / expired packaging",
+  "Audit recount - inventory surplus found",
+  "Audit recount - inventory shortage found",
+  "Custom Reason...",
 ];
 
 type StockRow = {
@@ -72,6 +95,34 @@ type AdjustmentRow = {
   adjusted_at: string;
 };
 
+type ReportOverview = {
+  total_distinct_products: number;
+  total_stored_units: number;
+  total_inventory_value_lkr: number;
+  total_damaged_or_lost_units: number;
+  total_loss_value_lkr: number;
+};
+
+type AdjustmentBreakdown = {
+  station_id: number;
+  station_city: string;
+  product_id: number;
+  product_name: string;
+  unit_price: number;
+  reason: string;
+  total_adjustment_events: number;
+  net_quantity_delta: number;
+  total_units_damaged_or_lost: number;
+  total_loss_value: number;
+  first_adjustment_at: string;
+  latest_adjustment_at: string;
+};
+
+type ReportSummary = {
+  overview: ReportOverview;
+  breakdown: AdjustmentBreakdown[];
+};
+
 type Banner = { type: "success" | "error"; text: string } | null;
 
 export default function WarehousePage() {
@@ -81,6 +132,10 @@ export default function WarehousePage() {
   const [manifestsNote, setManifestsNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<Banner>(null);
+
+  // Report #6 Summary State
+  const [summaryReport, setSummaryReport] = useState<ReportSummary | null>(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   // Train Cargo preview state
   const [expandedTripId, setExpandedTripId] = useState<number | null>(null);
@@ -110,7 +165,8 @@ export default function WarehousePage() {
   // Adjustment form
   const [adjustInventoryId, setAdjustInventoryId] = useState("");
   const [adjustDelta, setAdjustDelta] = useState("");
-  const [adjustReason, setAdjustReason] = useState("");
+  const [adjustReasonPreset, setAdjustReasonPreset] = useState(STANDARD_REASONS[0]);
+  const [adjustReasonCustom, setAdjustReasonCustom] = useState("");
   const [adjustSubmitting, setAdjustSubmitting] = useState(false);
 
   // Adjustment history (open for one stock row at a time)
@@ -118,12 +174,13 @@ export default function WarehousePage() {
   const [history, setHistory] = useState<AdjustmentRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Fetches stock + manifests + available bins for the chosen station.
+  // Fetches stock + manifests + available bins + Report 6 summary for the chosen station.
   const fetchStationData = useCallback(async (id: number) => {
-    const [stockResult, manifestResult, binsResult] = await Promise.allSettled([
+    const [stockResult, manifestResult, binsResult, reportResult] = await Promise.allSettled([
       apiFetch<{ inventory: StockRow[] }>(`/inventory/?station_id=${id}`),
       apiFetch<{ manifests: ManifestRow[] }>(`/inventory/manifests?station_id=${id}`),
       apiFetch<{ bins: BinOption[] }>(`/inventory/bins?station_id=${id}`),
+      apiFetch<ReportSummary>(`/inventory/reports/summary?station_id=${id}`),
     ]);
 
     if (stockResult.status === "rejected") throw stockResult.reason;
@@ -145,7 +202,12 @@ export default function WarehousePage() {
     if (binsResult.status === "fulfilled") {
       setAvailableBins(binsResult.value.bins);
     }
+
+    if (reportResult.status === "fulfilled") {
+      setSummaryReport(reportResult.value);
+    }
   }, []);
+
 
 
   const switchOperator = useCallback(
@@ -316,12 +378,27 @@ export default function WarehousePage() {
     e.preventDefault();
     const delta = Number(adjustDelta);
 
-    if (!adjustInventoryId || !adjustDelta || !adjustReason.trim()) {
+    const finalReason =
+      adjustReasonPreset === "Custom Reason..."
+        ? adjustReasonCustom.trim()
+        : adjustReasonPreset;
+
+    if (!adjustInventoryId || !adjustDelta || !finalReason) {
       setBanner({ type: "error", text: "Please choose a product, a quantity, and a reason." });
       return;
     }
     if (!Number.isInteger(delta) || delta === 0) {
       setBanner({ type: "error", text: "Quantity must be a whole number and cannot be 0." });
+      return;
+    }
+
+    // Negative stock guard: prevent stock level from dropping below 0
+    const selectedItem = stock.find((item) => item.inventory_id === Number(adjustInventoryId));
+    if (selectedItem && delta < 0 && Math.abs(delta) > selectedItem.stored_quantity) {
+      setBanner({
+        type: "error",
+        text: `Cannot reduce stock by ${Math.abs(delta)}. Current stored quantity is only ${selectedItem.stored_quantity}. Negative warehouse stock is prohibited.`,
+      });
       return;
     }
 
@@ -333,7 +410,7 @@ export default function WarehousePage() {
         body: JSON.stringify({
           inventory_id: Number(adjustInventoryId),
           quantity_delta: delta,
-          reason: adjustReason.trim(),
+          reason: finalReason,
         }),
       });
       setBanner({
@@ -341,7 +418,7 @@ export default function WarehousePage() {
         text: `Adjustment saved. New stock level: ${res.new_stored_quantity}.`,
       });
       setAdjustDelta("");
-      setAdjustReason("");
+      setAdjustReasonCustom("");
       await reloadStation();
 
       // Refresh the open history panel if it belongs to this product.
@@ -459,6 +536,142 @@ export default function WarehousePage() {
           >
             {banner.text}
           </div>
+        )}
+
+        {/* Store Manager Report #6 KPI Summary Cards */}
+        {summaryReport && (
+          <section className="mb-6 space-y-4" aria-labelledby="report-summary-title">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-green-600" />
+                <h2 id="report-summary-title" className="text-base font-bold text-text-heading">
+                  Station Store Operations &amp; Stock Value (Report #6)
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBreakdown((prev) => !prev)}
+                className="text-xs font-semibold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                {showBreakdown ? (
+                  <>
+                    Hide Audit Breakdown <ChevronUp className="h-3.5 w-3.5" />
+                  </>
+                ) : (
+                  <>
+                    View Audit Breakdown <ChevronDown className="h-3.5 w-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="glass-sm p-4 border border-green-200/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-muted">Total Stock Value</span>
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                </div>
+                <div className="mt-2 text-xl font-bold tracking-tight text-text-heading">
+                  LKR {Number(summaryReport.overview.total_inventory_value_lkr).toLocaleString()}
+                </div>
+                <span className="text-[11px] text-text-muted">
+                  {summaryReport.overview.total_distinct_products} active products
+                </span>
+              </div>
+
+              <div className="glass-sm p-4 border border-green-200/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-muted">Stored Units</span>
+                  <Package className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="mt-2 text-xl font-bold tracking-tight text-text-heading">
+                  {Number(summaryReport.overview.total_stored_units).toLocaleString()}
+                </div>
+                <span className="text-[11px] text-text-muted">Physical shelf stock</span>
+              </div>
+
+              <div className="glass-sm p-4 border border-green-200/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-muted">Damaged / Lost</span>
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                </div>
+                <div className="mt-2 text-xl font-bold tracking-tight text-amber-700">
+                  {Number(summaryReport.overview.total_damaged_or_lost_units).toLocaleString()}
+                </div>
+                <span className="text-[11px] text-text-muted">Total written-off units</span>
+              </div>
+
+              <div className="glass-sm p-4 border border-green-200/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-muted">Financial Loss</span>
+                  <Layers className="h-4 w-4 text-red-600" />
+                </div>
+                <div className="mt-2 text-xl font-bold tracking-tight text-status-issue">
+                  LKR {Number(summaryReport.overview.total_loss_value_lkr).toLocaleString()}
+                </div>
+                <span className="text-[11px] text-text-muted">Written-off merchandise</span>
+              </div>
+            </div>
+
+            {/* Expandable Report #6 Audit Breakdown Table */}
+            {showBreakdown && (
+              <div className="glass p-4 border border-green-200">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                    Station Adjustment Breakdown (View: v_stock_adjustment_summary)
+                  </h3>
+                  <span className="text-xs text-text-muted">
+                    {summaryReport.breakdown.length} discrepancy records
+                  </span>
+                </div>
+                {summaryReport.breakdown.length === 0 ? (
+                  <p className="text-xs text-text-muted py-2">
+                    No damage or discrepancy records found for this station.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-green-100 text-text-muted">
+                          <th className="pb-2 font-semibold">Product</th>
+                          <th className="pb-2 font-semibold">Reported Reason</th>
+                          <th className="pb-2 font-semibold text-center">Incidents</th>
+                          <th className="pb-2 font-semibold text-right">Lost Units</th>
+                          <th className="pb-2 font-semibold text-right">Financial Loss (LKR)</th>
+                          <th className="pb-2 font-semibold text-right">Latest Incident</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-green-50">
+                        {summaryReport.breakdown.map((item, idx) => (
+                          <tr key={`${item.product_id}-${item.reason}-${idx}`} className="hover:bg-green-50/50">
+                            <td className="py-2.5 font-medium text-text-heading">
+                              {item.product_name}
+                              <span className="block text-[10px] text-text-muted">
+                                Unit: LKR {item.unit_price}
+                              </span>
+                            </td>
+                            <td className="py-2.5 text-text-body">{item.reason}</td>
+                            <td className="py-2.5 text-center font-medium">
+                              {item.total_adjustment_events}
+                            </td>
+                            <td className="py-2.5 text-right font-semibold text-amber-700">
+                              {item.total_units_damaged_or_lost}
+                            </td>
+                            <td className="py-2.5 text-right font-bold text-status-issue">
+                              LKR {Number(item.total_loss_value).toLocaleString()}
+                            </td>
+                            <td className="py-2.5 text-right text-text-muted text-[11px]">
+                              {item.latest_adjustment_at}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
         )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -725,57 +938,79 @@ export default function WarehousePage() {
             number removes it.
           </p>
 
-          <form onSubmit={handleAdjustSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div>
-              <label htmlFor="adjust-product" className="input-label">
-                Product
-              </label>
-              <select
-                id="adjust-product"
-                className="input"
-                value={adjustInventoryId}
-                onChange={(e) => setAdjustInventoryId(e.target.value)}
-              >
-                <option value="">Select a product...</option>
-                {stock.map((row) => (
-                  <option key={row.inventory_id} value={row.inventory_id}>
-                    {row.product_name}
-                  </option>
-                ))}
-              </select>
+          <form onSubmit={handleAdjustSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label htmlFor="adjust-product" className="input-label">
+                  Product
+                </label>
+                <select
+                  id="adjust-product"
+                  className="input"
+                  value={adjustInventoryId}
+                  onChange={(e) => setAdjustInventoryId(e.target.value)}
+                >
+                  <option value="">Select a product...</option>
+                  {stock.map((row) => (
+                    <option key={row.inventory_id} value={row.inventory_id}>
+                      {row.product_name} (Current: {row.stored_quantity})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="adjust-qty" className="input-label">
+                  Quantity (+ adds, - removes)
+                </label>
+                <input
+                  id="adjust-qty"
+                  type="number"
+                  step="1"
+                  className="input"
+                  placeholder="-5 or 20"
+                  value={adjustDelta}
+                  onChange={(e) => setAdjustDelta(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="adjust-reason-select" className="input-label">
+                  Reason Preset
+                </label>
+                <select
+                  id="adjust-reason-select"
+                  className="input"
+                  value={adjustReasonPreset}
+                  onChange={(e) => setAdjustReasonPreset(e.target.value)}
+                >
+                  {STANDARD_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="adjust-qty" className="input-label">
-                Quantity
-              </label>
-              <input
-                id="adjust-qty"
-                type="number"
-                step="1"
-                className="input"
-                placeholder="-5 or 20"
-                value={adjustDelta}
-                onChange={(e) => setAdjustDelta(e.target.value)}
-              />
-            </div>
+            {adjustReasonPreset === "Custom Reason..." && (
+              <div>
+                <label htmlFor="adjust-reason-custom" className="input-label">
+                  Custom Discrepancy Reason
+                </label>
+                <input
+                  id="adjust-reason-custom"
+                  type="text"
+                  className="input"
+                  placeholder="Detail the specific audit finding or damage cause..."
+                  value={adjustReasonCustom}
+                  onChange={(e) => setAdjustReasonCustom(e.target.value)}
+                />
+              </div>
+            )}
 
-            <div>
-              <label htmlFor="adjust-reason" className="input-label">
-                Reason
-              </label>
-              <input
-                id="adjust-reason"
-                type="text"
-                className="input"
-                placeholder="e.g. water damage"
-                value={adjustReason}
-                onChange={(e) => setAdjustReason(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-end">
-              <Button type="submit" className="w-full" disabled={adjustSubmitting}>
+            <div className="flex justify-end">
+              <Button type="submit" className="w-full sm:w-auto" disabled={adjustSubmitting}>
                 {adjustSubmitting ? "Saving..." : "Save Adjustment"}
               </Button>
             </div>
