@@ -109,11 +109,37 @@ const FALLBACK_ORDERS: OrderItem[] = [
   },
 ];
 
+interface NotificationAlert {
+  id: number;
+  type: string;
+  recipient: string;
+  subject: string;
+  status: string;
+  timestamp: string;
+  body_preview: string;
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [notifications, setNotifications] = useState<NotificationAlert[]>([]);
+  const [showNotifications, setShowNotifications] = useState(true);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/notifications/recent?limit=5");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.notifications && Array.isArray(data.notifications)) {
+          setNotifications(data.notifications);
+        }
+      }
+    } catch {
+      // quiet fallback
+    }
+  }, []);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -136,7 +162,8 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
-  }, [loadOrders]);
+    loadNotifications();
+  }, [loadOrders, loadNotifications]);
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -197,6 +224,49 @@ export default function OrdersPage() {
             </Button>
           </div>
         </div>
+
+        {/* Live Logistics Manager Alerts Banner */}
+        {notifications.length > 0 && showNotifications && (
+          <div className="mb-6 rounded-2xl bg-emerald-50/90 border border-emerald-300/80 p-4 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                  Live Freight Dispatch & Logistics Alerts
+                </span>
+                <span className="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-1.5 py-0.5 rounded-full">
+                  {notifications.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotifications(false)}
+                className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+              {notifications.slice(0, 4).map((n) => (
+                <div
+                  key={n.id}
+                  className="rounded-xl bg-white/90 border border-emerald-200/60 p-2.5 text-xs flex items-start gap-2.5 shadow-2xs"
+                >
+                  <div className="p-1 rounded-lg bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
+                    <Train className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-text-heading truncate">{n.subject}</div>
+                    <div className="text-text-muted text-[11px] truncate mt-0.5">{n.body_preview}</div>
+                    <div className="text-[10px] text-emerald-700 font-medium mt-1">
+                      {n.recipient} • {n.timestamp}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Filter Controls */}
         <div className="glass p-4 rounded-2xl mb-6 flex flex-col sm:flex-row gap-4 justify-between items-center">
