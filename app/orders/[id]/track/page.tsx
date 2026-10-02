@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "motion/react";
@@ -15,6 +15,7 @@ import {
   Package,
   Calendar,
   Share2,
+  Loader2,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
@@ -29,13 +30,48 @@ interface TrackingMilestone {
   active: boolean;
 }
 
+interface OrderDetails {
+  id: string;
+  order_id: number;
+  destination: string;
+  hubStation: string;
+  cargo: string;
+  weight: string;
+  date: string;
+  status: string;
+  trainSlot: string;
+  recipient: string;
+  amount: number;
+  milestones: TrackingMilestone[];
+}
+
 export default function OrderTrackPage() {
   const params = useParams();
   const orderId = (params?.id as string) || "KP-78291-CMB";
 
   const [copied, setCopied] = useState(false);
+  const [orderData, setOrderData] = useState<OrderDetails | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const milestones: TrackingMilestone[] = [
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/v1/orders/${orderId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setOrderData(data);
+        }
+      } catch (e) {
+        console.error("Failed to load tracking data", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [orderId]);
+
+  const defaultMilestones: TrackingMilestone[] = [
     {
       title: "Order Received & Verified",
       location: "Kandy Logistics Hub, Peradeniya Rd",
@@ -86,6 +122,10 @@ export default function OrderTrackPage() {
     },
   ];
 
+  const milestones = orderData?.milestones && orderData.milestones.length > 0
+    ? orderData.milestones
+    : defaultMilestones;
+
   function copyTrackingLink() {
     if (typeof window !== "undefined") {
       navigator.clipboard.writeText(window.location.href);
@@ -125,12 +165,12 @@ export default function OrderTrackPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="font-mono text-2xl font-bold text-text-heading">
-                  {orderId}
+                  {orderData?.id || orderId}
                 </h1>
-                <StatusPill status="transit" label="In Transit on Rail" />
+                <StatusPill status={(orderData?.status as any) || "transit"} />
               </div>
               <p className="text-sm text-text-muted">
-                Kandy Central Goods Shed → Colombo Fort Hub → Doorstep
+                Kandy Central Goods Shed → {orderData?.destination || "Colombo"} Hub ({orderData?.hubStation || "Colombo Fort Goods Shed"}) → Doorstep
               </p>
             </div>
 
@@ -152,19 +192,19 @@ export default function OrderTrackPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 text-sm">
             <div>
               <span className="text-xs text-text-muted block">Estimated Delivery</span>
-              <strong className="text-text-heading font-semibold">Today, ~12:30 PM</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.date ? `${orderData.date}` : "Today, ~12:30 PM"}</strong>
             </div>
             <div>
               <span className="text-xs text-text-muted block">Freight Service</span>
-              <strong className="text-text-heading font-semibold">Rail Express 101</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.trainSlot || "Rail Express 101"}</strong>
             </div>
             <div>
               <span className="text-xs text-text-muted block">Cargo Weight</span>
-              <strong className="text-text-heading font-semibold">120 kg (4 Crates)</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.weight ? `${orderData.weight}` : "120 kg"}</strong>
             </div>
             <div>
               <span className="text-xs text-text-muted block">Recipient</span>
-              <strong className="text-text-heading font-semibold">Lanka Freight Ltd</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.recipient || "Lanka Freight Ltd"}</strong>
             </div>
           </div>
         </div>

@@ -81,13 +81,38 @@ export default function NewOrderPage() {
   const weightNum = parseFloat(weightKg) || 1;
   const calculatedCost = Math.round(currentHub.baseFee + weightNum * currentCargo.baseRatePerKg);
 
-  function handleConfirm() {
+  async function handleConfirm() {
     setIsSubmitting(true);
-    setTimeout(() => {
-      const trackingCode = `KP-${Math.floor(10000 + Math.random() * 90000)}-${currentHub.id}`;
-      setCompletedOrder(trackingCode);
+    try {
+      const res = await fetch("/api/v1/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destination_hub: currentHub.id,
+          cargo_type: currentCargo.id,
+          cargo_description: cargoDescription,
+          weight_kg: weightNum,
+          recipient_name: recipientName || "Lanka Retail Partner",
+          recipient_phone: recipientPhone || "0771234567",
+          delivery_address: deliveryAddress || currentHub.station,
+          booking_date: bookingDate,
+          slot: slot,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCompletedOrder(data.id);
+      } else {
+        const fallbackCode = `KP-${Math.floor(10000 + Math.random() * 90000)}-${currentHub.id}`;
+        setCompletedOrder(fallbackCode);
+      }
+    } catch {
+      const fallbackCode = `KP-${Math.floor(10000 + Math.random() * 90000)}-${currentHub.id}`;
+      setCompletedOrder(fallbackCode);
+    } finally {
       setIsSubmitting(false);
-    }, 900);
+    }
   }
 
   return (

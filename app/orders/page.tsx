@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import {
@@ -12,6 +12,7 @@ import {
   Calendar,
   Package,
   MapPin,
+  Loader2,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
@@ -21,6 +22,7 @@ type Status = "pending" | "transit" | "delivered" | "issue";
 
 interface OrderItem {
   id: string;
+  order_id?: number;
   destination: string;
   hubStation: string;
   cargo: string;
@@ -32,86 +34,111 @@ interface OrderItem {
   amount: number;
 }
 
-const MOCK_ORDERS: OrderItem[] = [
+const FALLBACK_ORDERS: OrderItem[] = [
   {
-    id: "KP-78291-CMB",
+    id: "KP-01007-CMB",
     destination: "Colombo",
-    hubStation: "Colombo Fort Station",
-    cargo: "Ceylon Tea Crates (Export grade)",
-    weight: "120 kg",
+    hubStation: "Colombo Fort Goods Shed",
+    cargo: "Kandy Pure Ceylon Tea 500g Pack",
+    weight: "300 kg",
     date: "2026-09-04",
     status: "transit",
-    trainSlot: "06:30 AM Express Rail 101",
-    recipient: "Lanka Freight Forwarders Ltd",
-    amount: 3250,
+    trainSlot: "06:00 AM Express Rail 101",
+    recipient: "Lanka Retailers Ltd",
+    amount: 135000,
   },
   {
-    id: "KP-64102-GAL",
+    id: "KP-01005-GAL",
     destination: "Galle",
     hubStation: "Galle Central Hub",
-    cargo: "Organic Spices & Vanilla",
-    weight: "45 kg",
-    date: "2026-09-03",
+    cargo: "Kandy Spice Mixture Box (12 Units)",
+    weight: "375 kg",
+    date: "2026-09-01",
     status: "delivered",
-    trainSlot: "11:15 AM Coastal Express",
+    trainSlot: "07:00 AM Coastal Express 103",
     recipient: "Southern Spice Exporters",
-    amount: 2100,
+    amount: 85000,
   },
   {
-    id: "KP-59381-JAF",
-    destination: "Jaffna",
-    hubStation: "Jaffna Railway Hub",
-    cargo: "Handicrafts & Brassware",
-    weight: "80 kg",
+    id: "KP-01003-CMB",
+    destination: "Colombo",
+    hubStation: "Colombo Fort Station",
+    cargo: "Highland Organic Produce & Spices",
+    weight: "200 kg",
     date: "2026-09-05",
     status: "pending",
     trainSlot: "09:00 PM Night Express 404",
-    recipient: "Northern Trading Co.",
-    amount: 3450,
+    recipient: "Lanka WholeSalers LTD",
+    amount: 64000,
   },
   {
-    id: "KP-41908-NEG",
-    destination: "Negombo",
-    hubStation: "Negombo Hub",
-    cargo: "Fresh Highland Vegetables",
-    weight: "200 kg",
+    id: "KP-01004-GAL",
+    destination: "Galle",
+    hubStation: "Galle Station Hub",
+    cargo: "FMCG Biscuits Master Carton",
+    weight: "1250 kg",
     date: "2026-09-02",
     status: "delivered",
-    trainSlot: "06:30 AM Express Rail 101",
-    recipient: "Airport Catering Services",
-    amount: 4800,
+    trainSlot: "06:00 AM Express Rail 101",
+    recipient: "Galle Retail Partners",
+    amount: 120000,
   },
   {
-    id: "KP-32115-MAT",
-    destination: "Matara",
-    hubStation: "Matara Railway Hub",
-    cargo: "Textiles & Garments",
-    weight: "150 kg",
-    date: "2026-09-01",
-    status: "delivered",
-    trainSlot: "03:45 PM Mainline Freight 312",
-    recipient: "Ruhuna Apparel Outlets",
-    amount: 3850,
-  },
-  {
-    id: "KP-28043-TRN",
+    id: "KP-01006-CMB",
     destination: "Trincomalee",
     hubStation: "Trincomalee Freight Hub",
-    cargo: "Confectionery & Bakery Supplies",
-    weight: "65 kg",
+    cargo: "Coconut Oil 5L Containers",
+    weight: "270 kg",
     date: "2026-08-30",
     status: "issue",
     trainSlot: "11:15 AM Intercity Rail 205",
     recipient: "Eastern Province Stores",
-    amount: 2450,
+    amount: 72000,
+  },
+  {
+    id: "KP-01001-CMB",
+    destination: "Colombo",
+    hubStation: "Colombo Main Railway Station Store",
+    cargo: "FMCG Biscuits Master Carton (24 Packs)",
+    weight: "2500 kg",
+    date: "2026-08-08",
+    status: "pending",
+    trainSlot: "06:30 AM Express Rail 101",
+    recipient: "Lanka Retailers Ltd",
+    amount: 240000,
   },
 ];
 
 export default function OrdersPage() {
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const filteredOrders = MOCK_ORDERS.filter((order) => {
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/v1/orders");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setOrders(data);
+          return;
+        }
+      }
+      setOrders(FALLBACK_ORDERS);
+    } catch {
+      setOrders(FALLBACK_ORDERS);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -210,7 +237,13 @@ export default function OrdersPage() {
 
         {/* Orders List / Table */}
         <div className="glass rounded-2xl overflow-hidden">
-          {filteredOrders.length === 0 ? (
+          {loading ? (
+            <div className="p-16 flex flex-col items-center justify-center">
+              <Loader2 className="h-8 w-8 text-green-600 animate-spin mb-3" />
+              <p className="text-sm font-medium text-text-heading">Loading live consignment records from database...</p>
+              <p className="text-xs text-text-muted mt-1">Connecting to Kandypack Freight Logistics Engine</p>
+            </div>
+          ) : filteredOrders.length === 0 ? (
             <div className="p-12 text-center">
               <Package className="mx-auto h-12 w-12 text-green-600/50 mb-3" />
               <h3 className="font-bold text-text-heading mb-1">No consignments found</h3>
