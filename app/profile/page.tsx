@@ -83,6 +83,8 @@ function ProfileContent() {
   const [staffSuccess, setStaffSuccess] = useState("");
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const loadProfile = useCallback(async () => {
     try {
@@ -237,10 +239,42 @@ function ProfileContent() {
     router.push("/login");
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setSaveError("");
+    setSavedSuccess(false);
+    setSaveLoading(true);
+
+    try {
+      const res = await fetch("/api/v1/auth/me", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          phone,
+          address_line: addressLine,
+          city,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to update profile details.");
+      }
+
+      setProfile(data);
+      setName(data.name || "");
+      setPhone(data.phone || "");
+      setAddressLine(data.address_line || "");
+      setCity(data.city || "Colombo");
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving profile details.";
+      setSaveError(msg);
+    } finally {
+      setSaveLoading(false);
+    }
   }
 
   if (loading) {
@@ -601,9 +635,24 @@ function ProfileContent() {
                   </div>
                 </div>
 
+                {savedSuccess && (
+                  <div className="rounded-xl bg-green-50 border border-green-300 p-3 text-xs text-green-800 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                    <span>Profile details saved successfully!</span>
+                  </div>
+                )}
+
+                {saveError && (
+                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-800 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+                    <span>{saveError}</span>
+                  </div>
+                )}
+
                 <div className="pt-2">
-                  <Button variant="primary" size="md">
-                    <Save className="h-4 w-4 mr-1.5" /> Save Profile Details
+                  <Button variant="primary" size="md" disabled={saveLoading}>
+                    {saveLoading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+                    Save Profile Details
                   </Button>
                 </div>
               </form>
