@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, ArrowRight, Train, Sparkles } from "lucide-react";
+import { Mail, Lock, ArrowRight, Train } from "lucide-react";
+import { apiFetch, setAuthToken, describeError } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,13 +14,9 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  function fillDemoCredentials() {
-    setEmail("sunil@kandycargo.lk");
-    setPassword("kandypack2026");
-    setError("");
-  }
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
@@ -32,11 +29,38 @@ export default function LoginPage() {
       return;
     }
 
-    // Mock login success and redirect
-    setSuccess(true);
-    setTimeout(() => {
-      router.push("/orders");
-    }, 1200);
+    setSubmitting(true);
+    try {
+      const res = await apiFetch<{
+        access_token: string;
+        role: string;
+        email: string;
+      }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password,
+          portal_type: "admin",
+        }),
+      });
+
+      if (res.access_token) {
+        setAuthToken(res.access_token);
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        if (res.role === "STORE_MGR" || res.role === "WAREHOUSE_STAFF") {
+          router.push("/warehouse");
+        } else {
+          router.push("/orders");
+        }
+      }, 700);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -74,23 +98,6 @@ export default function LoginPage() {
         <p className="mb-6 text-center text-sm text-green-100/80">
           Sign in to manage your shipments
         </p>
-
-        {/* Demo Credentials Helper Card */}
-        <div className="mb-6 rounded-2xl bg-white/10 border border-white/15 p-3.5 flex items-center justify-between text-xs backdrop-blur-md">
-          <div>
-            <div className="font-semibold text-green-300 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-green-300" /> Demo Credentials
-            </div>
-            <div className="text-white/70 mt-0.5">sunil@kandycargo.lk • kandypack2026</div>
-          </div>
-          <button
-            type="button"
-            onClick={fillDemoCredentials}
-            className="rounded-lg bg-green-500/25 hover:bg-green-500/40 text-green-200 border border-green-400/30 px-3 py-1.5 text-[11px] font-semibold transition-all cursor-pointer"
-          >
-            Auto Fill
-          </button>
-        </div>
 
         {success ? (
           <motion.div

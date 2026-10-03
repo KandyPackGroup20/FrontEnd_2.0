@@ -148,17 +148,16 @@ export default function WarehousePage() {
   const [editingBinInvId, setEditingBinInvId] = useState<number | null>(null);
   const [assigningBin, setAssigningBin] = useState(false);
 
-  // Active Viva Operator (RBAC Session Switcher)
+  // Authenticated Employee Profile
   const [operator, setOperator] = useState<{
     name: string;
     role: "STORE_MGR" | "WAREHOUSE_STAFF";
     email: string;
   }>({
-    name: "Sunil (Colombo Store Manager)",
+    name: "Sunil Colombo Store Mgr",
     role: "STORE_MGR",
     email: "store.colombo@kandypack.lk",
   });
-  const [switchingOperator, setSwitchingOperator] = useState(false);
 
   // Receive a manifest
   const [receivingTripId, setReceivingTripId] = useState<number | null>(null);
@@ -211,57 +210,37 @@ export default function WarehousePage() {
 
 
 
-  const switchOperator = useCallback(
-    async (role: "STORE_MGR" | "WAREHOUSE_STAFF") => {
-      setSwitchingOperator(true);
-      try {
-        const res = await apiFetch<{
-          access_token: string;
-          user: { name: string; role: "STORE_MGR" | "WAREHOUSE_STAFF"; email: string };
-        }>("/inventory/session", {
-          method: "POST",
-          body: JSON.stringify({ role }),
-        });
-        setAuthToken(res.access_token);
-        setOperator({
-          name: res.user.name,
-          role: res.user.role,
-          email: res.user.email,
-        });
-        await fetchStationData(stationId);
-      } catch (err) {
-        setBanner({ type: "error", text: describeError(err) });
-      } finally {
-        setSwitchingOperator(false);
-      }
-    },
-    [stationId, fetchStationData]
-  );
-
-  // Load data whenever the station changes; auto-authenticate default session
+  // Check active user session on load and fetch station data
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Ensure fresh session token matching active operator
-        const res = await apiFetch<{
-          access_token: string;
-          user: { name: string; role: "STORE_MGR" | "WAREHOUSE_STAFF"; email: string };
-        }>("/inventory/session", {
-          method: "POST",
-          body: JSON.stringify({ role: operator.role }),
-        });
-        setAuthToken(res.access_token);
+        // Fetch currently authenticated profile from backend
+        const user = await apiFetch<{
+          user_id: number;
+          name: string;
+          email: string;
+          role: "STORE_MGR" | "WAREHOUSE_STAFF" | string;
+        }>("/auth/me");
+
         if (!cancelled) {
           setOperator({
-            name: res.user.name,
-            role: res.user.role,
-            email: res.user.email,
+            name: user.name,
+            role: user.role === "WAREHOUSE_STAFF" ? "WAREHOUSE_STAFF" : "STORE_MGR",
+            email: user.email,
           });
         }
+
         await fetchStationData(stationId);
         if (!cancelled) setBanner(null);
       } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          // If not authenticated, redirect to login
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+          return;
+        }
         if (!cancelled) setBanner({ type: "error", text: describeError(err) });
       } finally {
         if (!cancelled) setLoading(false);
@@ -475,38 +454,14 @@ export default function WarehousePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white/80 p-1 rounded-xl border border-green-200 shadow-xs">
-              <button
-                type="button"
-                onClick={() => switchOperator("STORE_MGR")}
-                disabled={switchingOperator || operator.role === "STORE_MGR"}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                  operator.role === "STORE_MGR"
-                    ? "bg-green-600 text-white shadow-xs"
-                    : "text-text-muted hover:text-text-heading hover:bg-green-50"
-                }`}
-              >
-                Store Manager
-              </button>
-              <button
-                type="button"
-                onClick={() => switchOperator("WAREHOUSE_STAFF")}
-                disabled={switchingOperator || operator.role === "WAREHOUSE_STAFF"}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                  operator.role === "WAREHOUSE_STAFF"
-                    ? "bg-green-600 text-white shadow-xs"
-                    : "text-text-muted hover:text-text-heading hover:bg-green-50"
-                }`}
-              >
-                Warehouse Staff
-              </button>
-            </div>
-
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
+                try {
+                  await apiFetch("/auth/logout", { method: "POST" });
+                } catch {}
+                setAuthToken(null);
                 if (typeof window !== "undefined") {
-                  localStorage.removeItem("kandypack_auth_token");
                   window.location.href = "/login";
                 }
               }}
