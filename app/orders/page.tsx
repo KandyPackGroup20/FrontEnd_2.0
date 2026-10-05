@@ -17,6 +17,11 @@ import {
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import {
+  AlertsSidebar,
+  NotificationBellButton,
+  LogisticsNotification,
+} from "@/components/notifications/AlertsSidebar";
 
 type Status = "pending" | "transit" | "delivered" | "issue";
 
@@ -109,31 +114,27 @@ const FALLBACK_ORDERS: OrderItem[] = [
   },
 ];
 
-interface NotificationAlert {
-  id: number;
-  type: string;
-  recipient: string;
-  subject: string;
-  status: string;
-  timestamp: string;
-  body_preview: string;
-}
-
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [notifications, setNotifications] = useState<NotificationAlert[]>([]);
+  const [notifications, setNotifications] = useState<LogisticsNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   const loadNotifications = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/notifications/recent?limit=5");
+      const res = await fetch("/api/v1/notifications/recent?limit=50");
       if (res.ok) {
         const data = await res.json();
         if (data.notifications && Array.isArray(data.notifications)) {
           setNotifications(data.notifications);
+        }
+        if (typeof data.unread_count === "number") {
+          setUnreadCount(data.unread_count);
         }
       }
     } catch {
@@ -163,6 +164,8 @@ export default function OrdersPage() {
   useEffect(() => {
     loadOrders();
     loadNotifications();
+    const interval = setInterval(loadNotifications, 6000);
+    return () => clearInterval(interval);
   }, [loadOrders, loadNotifications]);
 
   const filteredOrders = orders.filter((order) => {
@@ -192,6 +195,13 @@ export default function OrdersPage() {
         </Link>
 
         <div className="flex items-center gap-3">
+          <NotificationBellButton
+            onClick={() => {
+              setSidebarTab("unread");
+              setSidebarOpen(true);
+            }}
+            unreadCount={unreadCount}
+          />
           <Button variant="primary" size="sm" href="/order/new">
             <Plus className="h-4 w-4" />
             Book Shipment
@@ -218,6 +228,17 @@ export default function OrdersPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setSidebarTab("history");
+                setSidebarOpen(true);
+              }}
+              className="text-emerald-800 border-emerald-300 hover:bg-emerald-50 cursor-pointer"
+            >
+              Alert History Tab
+            </Button>
             <Button variant="secondary" size="sm" href="/order/new">
               <Plus className="h-4 w-4" />
               New Consignment
@@ -234,32 +255,74 @@ export default function OrdersPage() {
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
                   Live Freight Dispatch & Logistics Alerts
                 </span>
-                <span className="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-1.5 py-0.5 rounded-full">
-                  {notifications.length}
-                </span>
+                {unreadCount > 0 ? (
+                  <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full animate-pulse">
+                    {unreadCount} Unread
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-1.5 py-0.5 rounded-full">
+                    All Caught Up
+                  </span>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => setShowNotifications(false)}
-                className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 cursor-pointer"
-              >
-                Dismiss
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSidebarTab("unread");
+                    setSidebarOpen(true);
+                  }}
+                  className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline decoration-emerald-400 hover:decoration-emerald-700 cursor-pointer"
+                >
+                  Open Sidebar Drawer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSidebarTab("history");
+                    setSidebarOpen(true);
+                  }}
+                  className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline decoration-emerald-400 hover:decoration-emerald-700 cursor-pointer"
+                >
+                  Alert History Tab
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifications(false)}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-950 cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
               {notifications.slice(0, 4).map((n) => (
                 <div
                   key={n.id}
-                  className="rounded-xl bg-white/90 border border-emerald-200/60 p-2.5 text-xs flex items-start gap-2.5 shadow-2xs"
+                  onClick={() => {
+                    setSidebarTab(n.is_read ? "history" : "unread");
+                    setSidebarOpen(true);
+                  }}
+                  className={`rounded-xl border p-2.5 text-xs flex items-start gap-2.5 shadow-2xs transition-all hover:shadow-xs cursor-pointer ${
+                    !n.is_read
+                      ? "bg-white/95 border-emerald-300 ring-1 ring-emerald-200"
+                      : "bg-white/70 border-emerald-100"
+                  }`}
                 >
                   <div className="p-1 rounded-lg bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
                     <Train className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold text-text-heading truncate">{n.subject}</div>
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="font-bold text-text-heading truncate">{n.subject}</div>
+                      {!n.is_read && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      )}
+                    </div>
                     <div className="text-text-muted text-[11px] truncate mt-0.5">{n.body_preview}</div>
-                    <div className="text-[10px] text-emerald-700 font-medium mt-1">
-                      {n.recipient} • {n.timestamp}
+                    <div className="text-[10px] text-emerald-700 font-medium mt-1 flex items-center justify-between">
+                      <span>{n.recipient} • {n.timestamp}</span>
+                      <span className="font-bold text-emerald-800 hover:underline">View in Sidebar →</span>
                     </div>
                   </div>
                 </div>
@@ -422,6 +485,18 @@ export default function OrdersPage() {
           )}
         </div>
       </div>
+
+      {/* Slide-over Logistics Alerts & History Sidebar Drawer */}
+      <AlertsSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        initialTab={sidebarTab}
+        onNotificationsUpdated={(cnt, notifs) => {
+          setUnreadCount(cnt);
+          setNotifications(notifs);
+        }}
+      />
     </div>
   );
 }
+

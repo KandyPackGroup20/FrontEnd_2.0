@@ -25,6 +25,10 @@ import {
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import {
+  AlertsSidebar,
+  NotificationBellButton,
+} from "@/components/notifications/AlertsSidebar";
 
 interface CatalogueProduct {
   product_id: number;
@@ -173,6 +177,9 @@ export default function NewOrderPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<string | null>(null);
   const [notifiedManagersCount, setNotifiedManagersCount] = useState<number>(1);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   // Fetch live catalogue from backend
   useEffect(() => {
@@ -279,9 +286,15 @@ export default function NewOrderPage() {
         const data = await res.json();
         setCompletedOrder(data.id || `KP-${data.order_id}-${currentHub.id}`);
         setNotifiedManagersCount(data.notified_managers || 1);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("kandypack:order_placed"));
+        }
       } else {
         const fallbackCode = `KP-${Math.floor(10000 + Math.random() * 90000)}-${currentHub.id}`;
         setCompletedOrder(fallbackCode);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("kandypack:order_placed"));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -306,6 +319,13 @@ export default function NewOrderPage() {
         </Link>
 
         <div className="flex items-center gap-3">
+          <NotificationBellButton
+            onClick={() => {
+              setSidebarTab("unread");
+              setSidebarOpen(true);
+            }}
+            unreadCount={unreadCount}
+          />
           <Link
             href="/orders"
             className="text-sm font-semibold text-text-muted hover:text-green-700 transition-colors"
@@ -385,15 +405,29 @@ export default function NewOrderPage() {
               {/* Automated Logistics Manager Alert Banner */}
               <div className="rounded-2xl bg-emerald-50 border border-emerald-300 p-4 mb-6 text-left flex items-start gap-3 shadow-xs">
                 <Bell className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <div className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
-                    Logistics Manager Notified Automatically
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                      Logistics Manager Notified Automatically
+                    </span>
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   </div>
                   <div className="text-xs text-emerald-800 mt-1 leading-relaxed">
                     Automated email and dispatch alert successfully queued to{" "}
                     <strong>logistics@kandypack.lk</strong> (Kimal Logistics Mgr). Staff can now schedule
                     rail freight wagons from Kandy Central Goods Yard.
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSidebarTab("unread");
+                      setSidebarOpen(true);
+                    }}
+                    className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Bell className="h-3 w-3" />
+                    <span>View Real Alert in Sidebar Drawer →</span>
+                  </button>
                 </div>
               </div>
 
@@ -953,6 +987,15 @@ export default function NewOrderPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Slide-over Logistics Alerts & History Sidebar Drawer */}
+      <AlertsSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        initialTab={sidebarTab}
+        onNotificationsUpdated={(cnt) => setUnreadCount(cnt)}
+      />
     </div>
   );
 }
+

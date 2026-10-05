@@ -5,10 +5,17 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { Menu, X, Train, ArrowRight } from "lucide-react";
 import Button from "@/components/ui/Button";
+import {
+  AlertsSidebar,
+  NotificationBellButton,
+} from "@/components/notifications/AlertsSidebar";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
     function onScroll() {
@@ -81,6 +88,13 @@ export default function Navbar() {
 
           {/* Desktop CTA */}
           <div className="hidden items-center gap-3 md:flex">
+            <NotificationBellButton
+              onClick={() => {
+                setSidebarTab("unread");
+                setSidebarOpen(true);
+              }}
+              unreadCount={unreadCount}
+            />
             <Button variant="secondary" size="sm" href="/login" id="nav-sign-in">
               Sign in
             </Button>
@@ -91,19 +105,28 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Hamburger */}
-          <button
-            className="flex h-10 w-10 items-center justify-center rounded-xl md:hidden"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            aria-expanded={mobileOpen}
-            id="nav-mobile-toggle"
-          >
-            {mobileOpen ? (
-              <X className="h-5 w-5 text-text-heading" />
-            ) : (
-              <Menu className="h-5 w-5 text-text-heading" />
-            )}
-          </button>
+          <div className="flex items-center gap-2 md:hidden">
+            <NotificationBellButton
+              onClick={() => {
+                setSidebarTab("unread");
+                setSidebarOpen(true);
+              }}
+              unreadCount={unreadCount}
+            />
+            <button
+              className="flex h-10 w-10 items-center justify-center rounded-xl"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileOpen}
+              id="nav-mobile-toggle"
+            >
+              {mobileOpen ? (
+                <X className="h-5 w-5 text-text-heading" />
+              ) : (
+                <Menu className="h-5 w-5 text-text-heading" />
+              )}
+            </button>
+          </div>
         </nav>
       </motion.header>
 
@@ -141,6 +164,15 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Slide-over Logistics Alerts & History Sidebar Drawer */}
+      <AlertsSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        initialTab={sidebarTab}
+        onNotificationsUpdated={(cnt) => setUnreadCount(cnt)}
+      />
     </>
   );
 }
+
