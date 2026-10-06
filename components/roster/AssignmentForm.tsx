@@ -97,10 +97,10 @@ export default function AssignmentForm({ catalog, onCreated }: AssignmentFormPro
           </select>
         </Field>
         <Field label="Start time — Sri Lanka time" id="roster-start-time">
-          <input id="roster-start-time" type="datetime-local" step="1" value={startTime} onChange={(event) => setStartTime(event.target.value)} disabled={submitting} required className="input" />
+          <input id="roster-start-time" type="datetime-local" step="60" value={startTime} onChange={(event) => setStartTime(event.target.value)} disabled={submitting} required className="input" />
         </Field>
         <Field label="End time — Sri Lanka time" id="roster-end-time">
-          <input id="roster-end-time" type="datetime-local" step="1" value={endTime} onChange={(event) => setEndTime(event.target.value)} disabled={submitting} required className="input" />
+          <input id="roster-end-time" type="datetime-local" step="60" value={endTime} onChange={(event) => setEndTime(event.target.value)} disabled={submitting} required className="input" />
         </Field>
 
         <div className="md:col-span-2 flex flex-wrap items-center gap-4">
