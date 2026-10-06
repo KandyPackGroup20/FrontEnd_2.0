@@ -124,12 +124,32 @@ export default function OrdersPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
+
+  const loadUserSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentUser(data);
+      } else {
+        setCurrentUser(null);
+      }
+    } catch {
+      setCurrentUser(null);
+    }
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     try {
       const res = await fetch("/api/v1/notifications/recent?limit=50");
       if (res.ok) {
         const data = await res.json();
+        if (data.authenticated === false) {
+          setNotifications([]);
+          setUnreadCount(0);
+          return;
+        }
         if (data.notifications && Array.isArray(data.notifications)) {
           setNotifications(data.notifications);
         }
@@ -162,11 +182,16 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => {
+    loadUserSession();
     loadOrders();
     loadNotifications();
     const interval = setInterval(loadNotifications, 6000);
     return () => clearInterval(interval);
-  }, [loadOrders, loadNotifications]);
+  }, [loadUserSession, loadOrders, loadNotifications]);
+
+  const isLogisticsStaff = Boolean(
+    currentUser && (currentUser.role === "LOGISTICS_MGR" || currentUser.role === "SUPERADMIN")
+  );
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -195,13 +220,15 @@ export default function OrdersPage() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <NotificationBellButton
-            onClick={() => {
-              setSidebarTab("unread");
-              setSidebarOpen(true);
-            }}
-            unreadCount={unreadCount}
-          />
+          {currentUser && (
+            <NotificationBellButton
+              onClick={() => {
+                setSidebarTab("unread");
+                setSidebarOpen(true);
+              }}
+              unreadCount={unreadCount}
+            />
+          )}
           <Button variant="primary" size="sm" href="/order/new">
             <Plus className="h-4 w-4" />
             Book Shipment
@@ -210,7 +237,7 @@ export default function OrdersPage() {
             href="/profile"
             className="text-sm font-medium text-text-muted hover:text-green-600 transition-colors"
           >
-            Profile
+            {currentUser ? currentUser.name.split(" ")[0] : "Profile"}
           </Link>
         </div>
       </div>
@@ -228,17 +255,19 @@ export default function OrdersPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setSidebarTab("history");
-                setSidebarOpen(true);
-              }}
-              className="text-emerald-800 border-emerald-300 hover:bg-emerald-50 cursor-pointer"
-            >
-              Alert History Tab
-            </Button>
+            {isLogisticsStaff && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSidebarTab("history");
+                  setSidebarOpen(true);
+                }}
+                className="text-emerald-800 border-emerald-300 hover:bg-emerald-50 cursor-pointer"
+              >
+                Alert History Tab
+              </Button>
+            )}
             <Button variant="secondary" size="sm" href="/order/new">
               <Plus className="h-4 w-4" />
               New Consignment
@@ -246,8 +275,8 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {/* Live Logistics Manager Alerts Banner */}
-        {notifications.length > 0 && showNotifications && (
+        {/* Live Logistics Manager Alerts Banner - Strictly for authenticated Logistics Staff */}
+        {isLogisticsStaff && notifications.length > 0 && showNotifications && (
           <div className="mb-6 rounded-2xl bg-emerald-50/90 border border-emerald-300/80 p-4 shadow-xs">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">

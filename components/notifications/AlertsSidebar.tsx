@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   AlertCircle,
   RefreshCw,
+  Lock,
+  ArrowRight,
 } from "lucide-react";
 
 export interface LogisticsNotification {
@@ -49,6 +51,8 @@ export function AlertsSidebar({
   const [notifications, setNotifications] = useState<LogisticsNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [historySearch, setHistorySearch] = useState<string>("");
   const [historyFilter, setHistoryFilter] = useState<"all" | "unread" | "read">("all");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -69,6 +73,19 @@ export function AlertsSidebar({
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.authenticated === false) {
+          setIsAuthenticated(false);
+          setNotifications([]);
+          setUnreadCount(0);
+          if (onNotificationsUpdated) {
+            onNotificationsUpdated(0, []);
+          }
+          return;
+        }
+
+        setIsAuthenticated(true);
+        setUserRole(data.role || null);
+
         const list: LogisticsNotification[] = Array.isArray(data.notifications)
           ? data.notifications
           : [];
@@ -83,6 +100,10 @@ export function AlertsSidebar({
         if (onNotificationsUpdated) {
           onNotificationsUpdated(count, list);
         }
+      } else if (res.status === 401) {
+        setIsAuthenticated(false);
+        setNotifications([]);
+        setUnreadCount(0);
       }
     } catch (err) {
       console.warn("[AlertsSidebar] Could not refresh notifications:", err);
@@ -218,7 +239,7 @@ export function AlertsSidebar({
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="text-[11px] font-medium text-emerald-700">
-                          100% Real Database Feed
+                          {userRole ? `${userRole.replace("_", " ")} Feed` : "100% Real Database Feed"}
                         </span>
                       </div>
                     </div>
@@ -326,7 +347,24 @@ export function AlertsSidebar({
 
               {/* Main Content Area */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {loading ? (
+                {!isAuthenticated ? (
+                  <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                    <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 border border-amber-200">
+                      <Lock className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">Sign In Required</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-[260px] leading-relaxed">
+                      Logistics dispatch alerts and order histories are protected and only accessible to authorized accounts.
+                    </p>
+                    <Link
+                      href="/login?redirect=/orders"
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
+                    >
+                      <span>Sign In to Access Alerts</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                ) : loading ? (
                   <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-xs gap-2">
                     <RefreshCw className="h-5 w-5 animate-spin text-emerald-600" />
                     <span>Loading real-time alerts...</span>
