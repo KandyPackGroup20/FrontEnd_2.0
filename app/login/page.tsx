@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, ArrowRight, Train } from "lucide-react";
-import { apiFetch, setAuthToken, describeError } from "@/lib/api";
+import { Mail, Lock, ArrowRight, Train, Loader2, AlertCircle } from "lucide-react";
+import { setAuthToken } from "@/lib/api";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get("redirect") || "/orders";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-
-  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,42 +26,60 @@ export default function LoginPage() {
       setError("Please fill in all fields.");
       return;
     }
-    if (!email.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
-    }
 
-    setSubmitting(true);
+    setLoading(true);
+
     try {
-      const res = await apiFetch<{
-        access_token: string;
-        role: string;
-        email: string;
-      }>("/auth/login", {
+      const cleanEmail = email.trim();
+      const portalType = cleanEmail.endsWith("@kandypack.lk") ? "admin" : "customer";
+
+      const res = await fetch("/api/v1/auth/login", {
         method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          email: email.trim(),
+          email: cleanEmail,
           password: password,
-          portal_type: "admin",
+          portal_type: portalType,
         }),
       });
 
-      if (res.access_token) {
-        setAuthToken(res.access_token);
+      let data: Record<string, unknown> | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Response was not JSON
+      }
+
+      if (!res.ok) {
+        throw new Error(
+          (data?.detail as string) || "Login failed. Please verify your credentials."
+        );
+      }
+
+      if (data?.access_token && typeof data.access_token === "string") {
+        setAuthToken(data.access_token);
       }
 
       setSuccess(true);
       setTimeout(() => {
-        if (res.role === "STORE_MGR" || res.role === "WAREHOUSE_STAFF") {
+        const role = data?.role as string | undefined;
+        if (role === "STORE_MGR" || role === "WAREHOUSE_STAFF") {
           router.push("/warehouse");
+        } else if (role === "SUPERADMIN" || data?.force_password_reset) {
+          router.push("/profile");
         } else {
-          router.push("/orders");
+          router.push(redirectTarget);
         }
       }, 700);
-    } catch (err) {
-      setError(describeError(err));
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(message);
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   }
 
@@ -96,7 +116,7 @@ export default function LoginPage() {
           Welcome back
         </h1>
         <p className="mb-6 text-center text-sm text-green-100/80">
-          Sign in to manage your shipments
+          Sign in to access your portal
         </p>
 
         {success ? (
@@ -106,95 +126,109 @@ export default function LoginPage() {
             animate={{ opacity: 1, scale: 1 }}
           >
             <p className="font-semibold text-green-300 text-lg">Login successful!</p>
-            <p className="mt-1 text-sm text-green-100/90">
-              Redirecting to your shipments dashboard...
-            </p>
-            <div className="mt-4">
-              <Link href="/orders" className="btn-primary inline-flex text-sm py-2 px-5">
-                Go to Orders
-              </Link>
-            </div>
+            <p className="mt-1 text-sm text-green-100/80">Redirecting to your dashboard...</p>
           </motion.div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2.5 rounded-xl bg-red-950/60 border border-red-500/30 p-3 text-xs text-red-200"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                <span>{error}</span>
+              </motion.div>
+            )}
+
             {/* Email */}
             <div>
-              <label htmlFor="login-email" className="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-green-100/90">
+              <label
+                htmlFor="login-email"
+                className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90"
+              >
                 Email address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
                 <input
                   id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl bg-white/15 border border-white/25 px-4 py-3 pl-10 text-sm text-white placeholder-white/50 backdrop-blur-md outline-none transition-all focus:border-green-400 focus:bg-white/20 focus:ring-2 focus:ring-green-400/30"
-                  placeholder="you@company.com"
+                  placeholder="name@example.com"
+                  className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
                   autoComplete="email"
+                  required
                 />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
               </div>
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="login-password" className="block mb-1.5 text-xs font-semibold uppercase tracking-wider text-green-100/90">
-                Password
-              </label>
+              <div className="flex justify-between items-center mb-1">
+                <label
+                  htmlFor="login-password"
+                  className="block text-xs font-semibold uppercase tracking-wider text-green-100/90"
+                >
+                  Password
+                </label>
+              </div>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
                 <input
                   id="login-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl bg-white/15 border border-white/25 px-4 py-3 pl-10 text-sm text-white placeholder-white/50 backdrop-blur-md outline-none transition-all focus:border-green-400 focus:bg-white/20 focus:ring-2 focus:ring-green-400/30"
                   placeholder="••••••••"
+                  className="w-full rounded-xl bg-white/10 border border-white/20 pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
                   autoComplete="current-password"
+                  required
                 />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
               </div>
             </div>
 
-            {/* Error */}
-            {error && (
-              <motion.p
-                className="rounded-xl bg-red-500/20 border border-red-500/40 px-4 py-2.5 text-sm text-red-200"
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {error}
-              </motion.p>
-            )}
-
-            {/* Forgot password */}
-            <div className="text-right">
-              <Link
-                href="#"
-                className="text-xs font-medium text-green-300 hover:text-green-200 transition-colors"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {/* Submit */}
+            {/* Submit Button */}
             <button
+              id="login-submit-btn"
               type="submit"
-              className="btn-primary w-full py-3 mt-2 shadow-lg shadow-green-950/40 flex items-center justify-center gap-2"
-              id="login-submit"
+              disabled={loading}
+              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.98] text-white font-semibold py-3 px-4 shadow-lg shadow-green-900/40 transition-all cursor-pointer disabled:opacity-50"
             >
-              Sign in
-              <ArrowRight className="h-4 w-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
         )}
 
-        <p className="mt-6 text-center text-sm text-white/75">
-          Do not have an account?{" "}
-          <Link href="/register" className="font-semibold text-green-300 hover:text-green-200 transition-colors">
-            Create one
+        <div className="mt-8 text-center text-xs text-white/70">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-semibold text-green-300 hover:text-green-200 transition-colors underline underline-offset-4"
+          >
+            Create account
           </Link>
-        </p>
+        </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

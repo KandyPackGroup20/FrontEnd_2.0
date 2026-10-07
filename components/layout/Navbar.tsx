@@ -5,10 +5,35 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { Menu, X, Train, ArrowRight } from "lucide-react";
 import Button from "@/components/ui/Button";
+import {
+  AlertsSidebar,
+  NotificationBellButton,
+} from "@/components/notifications/AlertsSidebar";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/v1/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUser(data);
+        } else {
+          setCurrentUser(null);
+        }
+      } catch {
+        setCurrentUser(null);
+      }
+    }
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     function onScroll() {
@@ -80,31 +105,65 @@ export default function Navbar() {
             ))}
           </ul>
 
-          {/* Desktop CTA */}
+          {/* Desktop CTA - Auth-Aware */}
           <div className="hidden items-center gap-3 md:flex">
-            <Button variant="secondary" size="sm" href="/login" id="nav-sign-in">
-              Sign in
-            </Button>
-            <Button variant="primary" size="sm" href="/register" id="nav-get-started">
-              Get Started
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+            {currentUser ? (
+              <>
+                <NotificationBellButton
+                  onClick={() => {
+                    setSidebarTab("unread");
+                    setSidebarOpen(true);
+                  }}
+                  unreadCount={unreadCount}
+                />
+                <Link
+                  href="/profile"
+                  className="text-sm font-semibold text-text-heading hover:text-green-700 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white/80"
+                >
+                  <span>{currentUser.name.split(" ")[0]}</span>
+                  <span className="text-[10px] bg-green-100 text-green-800 font-bold px-1.5 py-0.5 rounded-full">
+                    {currentUser.role}
+                  </span>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" size="sm" href="/login" id="nav-sign-in">
+                  Sign in
+                </Button>
+                <Button variant="primary" size="sm" href="/register" id="nav-get-started">
+                  Get Started
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile Hamburger */}
-          <button
-            className="flex h-10 w-10 items-center justify-center rounded-xl md:hidden"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            aria-expanded={mobileOpen}
-            id="nav-mobile-toggle"
-          >
-            {mobileOpen ? (
-              <X className="h-5 w-5 text-text-heading" />
-            ) : (
-              <Menu className="h-5 w-5 text-text-heading" />
+          <div className="flex items-center gap-2 md:hidden">
+            {currentUser && (
+              <NotificationBellButton
+                onClick={() => {
+                  setSidebarTab("unread");
+                  setSidebarOpen(true);
+                }}
+                unreadCount={unreadCount}
+              />
             )}
-          </button>
+            <button
+              className="flex h-10 w-10 items-center justify-center rounded-xl"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileOpen}
+              id="nav-mobile-toggle"
+            >
+              {mobileOpen ? (
+                <X className="h-5 w-5 text-text-heading" />
+              ) : (
+                <Menu className="h-5 w-5 text-text-heading" />
+              )}
+            </button>
+          </div>
         </nav>
       </motion.header>
 
@@ -131,17 +190,34 @@ export default function Navbar() {
             ))}
             <hr className="my-2 border-surface-glass-border" />
             <div className="flex flex-col gap-2">
-              <Button variant="secondary" href="/login" id="nav-mobile-sign-in">
-                Sign in
-              </Button>
-              <Button variant="primary" href="/register" id="nav-mobile-get-started">
-                Get Started
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              {currentUser ? (
+                <Button variant="secondary" href="/profile" id="nav-mobile-profile">
+                  Profile ({currentUser.name.split(" ")[0]})
+                </Button>
+              ) : (
+                <>
+                  <Button variant="secondary" href="/login" id="nav-mobile-sign-in">
+                    Sign in
+                  </Button>
+                  <Button variant="primary" href="/register" id="nav-mobile-get-started">
+                    Get Started
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Slide-over Logistics Alerts & History Sidebar Drawer */}
+      <AlertsSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        initialTab={sidebarTab}
+        onNotificationsUpdated={(cnt) => setUnreadCount(cnt)}
+      />
     </>
   );
 }
+
