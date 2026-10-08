@@ -140,6 +140,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
   const [selectedOrderForSuitable, setSelectedOrderForSuitable] = useState<PendingOrder | null>(null);
   const [suitableTripsList, setSuitableTripsList] = useState<SuitableTripOption[]>([]);
   const [suitableDrawerOpen, setSuitableDrawerOpen] = useState<boolean>(false);
+  const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
 
   // Allocation Breakdown state
   const [breakdownOrderId, setBreakdownOrderId] = useState<number | "">("");
@@ -407,10 +408,11 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }
 
-  // 5. Inspect Suitable Trips (LM-03, LM-04, LM-15)
+  // 5. Inspect Suitable Trips
   async function handleInspectSuitableTrips(orderId: number) {
     setLoading(true);
     setAlertBanner(null);
+    setSelectedTripId(null);
     const ord = pendingOrders.find((o) => o.order_id === orderId);
     setSelectedOrderForSuitable(ord || null);
 
@@ -429,8 +431,8 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }
 
-  // 6. Allocate Rail Capacity (LM-05, LM-07, LM-08, LM-09)
-  async function handleAllocate(orderId: number) {
+  // 6. Allocate Rail Capacity
+  async function handleAllocate(orderId: number, tripId?: number | null) {
     setLoading(true);
     setAlertBanner(null);
 
@@ -438,7 +440,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
       const res = await fetch("/api/v1/rail/allocate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: orderId }),
+        body: JSON.stringify({
+          order_id: orderId,
+          ...(tripId ? { trip_id: tripId } : {}),
+        }),
       });
 
       const data = await res.json();
@@ -504,14 +509,14 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }
 
-  // 8. Reverse Allocation (LM-18)
+  // 8. Reverse Allocation
   async function handleReverseAllocation(orderId: number) {
     if (!confirm(`Are you sure you want to reverse all train allocations for Order #${orderId}? This will free all reserved carriage slots.`)) return;
     setLoading(true);
     setAlertBanner(null);
 
     try {
-      const res = await fetch("/api/v1/rail/allocate/reverse", {
+      const res = await fetch(`/api/v1/rail/orders/${orderId}/reverse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order_id: orderId }),
@@ -522,9 +527,11 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         throw new Error(data.detail || "Failed to reverse allocation.");
       }
 
-      setAlertBanner({ type: "success", message: `Order #${orderId} allocation reversed. Reserved train capacity released.` });
+      setAlertBanner({ type: "success", message: `Order #${orderId} allocation reversed. Capacity restored and order returned to Pending Orders.` });
       setOrderAllocations(null);
-      refreshAll();
+      setBreakdownOrderId("");
+      await refreshAll();
+      setActiveTab("pending");
     } catch (err: any) {
       setAlertBanner({ type: "error", message: err.message });
     } finally {
@@ -978,13 +985,14 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                       <div className="flex items-center gap-2.5 shrink-0">
                         <button
                           onClick={() => handleInspectSuitableTrips(order.order_id)}
-                          className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
+                          className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-all cursor-pointer border border-slate-200 shadow-2xs"
                         >
-                          Check Suitable Trips
+                          <Search className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Find Trips</span>
                         </button>
 
                         <button
-                          onClick={() => handleAllocate(order.order_id)}
+                          onClick={() => handleAllocate(order.order_id, null)}
                           disabled={loading}
                           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-md shadow-green-600/20 transition-all cursor-pointer"
                         >
@@ -1445,57 +1453,103 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                     <p className="text-xs mt-1">There are no scheduled trips departing Kandy towards this destination before the delivery cutoff date.</p>
                   </div>
                 ) : (
-                  suitableTripsList.map((st) => (
-                    <div
-                      key={st.trip_id}
-                      className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2 font-mono font-bold text-slate-900 text-sm">
-                          <span>Trip #{st.trip_id}</span>
-                          <span className="text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-sans">
-                            Kandy Mainline
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-600 space-y-0.5 mt-1.5">
-                          <div>Departure: <strong className="text-slate-800">{st.departure_datetime}</strong></div>
-                          <div>Arrival: <strong className="text-slate-800">{st.arrival_datetime}</strong></div>
+                  suitableTripsList.map((st) => {
+                    const isSelected = selectedTripId === st.trip_id;
+                    const canFitOrder = selectedOrderForSuitable.total_required_space <= Number(st.remaining_space);
+                    return (
+                      <div
+                        key={st.trip_id}
+                        onClick={() => setSelectedTripId(isSelected ? null : st.trip_id)}
+                        className={`border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all ${
+                          isSelected
+                            ? "bg-green-50/70 border-green-500 ring-2 ring-green-500/30 shadow-sm"
+                            : "bg-slate-50/70 border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name="selected_trip"
+                            checked={isSelected}
+                            onChange={() => setSelectedTripId(st.trip_id)}
+                            className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 cursor-pointer"
+                          />
                           <div>
-                            Available Carriage Space: <strong className="text-green-700 font-bold">{Number(st.remaining_space).toFixed(1)} units</strong> ({Number(st.total_capacity).toFixed(1)} total)
+                            <div className="flex items-center gap-2 font-mono font-bold text-slate-900 text-sm">
+                              <span>Trip #{st.trip_id}</span>
+                              <span className="text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-sans">
+                                Kandy Mainline
+                              </span>
+                              {canFitOrder ? (
+                                <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-sans">
+                                  Fits Entire Order
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-sans">
+                                  Partial (Requires Spillover)
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-600 space-y-0.5 mt-1.5">
+                              <div>Departure: <strong className="text-slate-800">{st.departure_datetime}</strong></div>
+                              <div>Arrival: <strong className="text-slate-800">{st.arrival_datetime}</strong></div>
+                              <div>
+                                Available Carriage Space: <strong className="text-green-700 font-bold">{Number(st.remaining_space).toFixed(1)} units</strong> ({Number(st.total_capacity).toFixed(1)} total)
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="text-right sm:self-center">
-                        <span className="text-xs font-mono font-semibold text-slate-600 block">
-                          {st.utilisation_pct.toFixed(0)}% full
-                        </span>
+                        <div className="text-right sm:self-center flex sm:flex-col items-center sm:items-end justify-between sm:justify-center">
+                          <span className="text-xs font-mono font-semibold text-slate-600 block">
+                            {st.utilisation_pct.toFixed(0)}% full
+                          </span>
+                          <span className="text-[11px] text-green-700 font-semibold mt-1">
+                            {isSelected ? "Selected ✓" : "Click to select"}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <span className="text-xs text-slate-500">
                   {suitableTripsList.length} suitable train trips discovered
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setSuitableDrawerOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
                   >
                     Close
                   </button>
+
+                  {selectedTripId ? (
+                    <button
+                      onClick={() => {
+                        setSuitableDrawerOpen(false);
+                        handleAllocate(selectedOrderForSuitable.order_id, selectedTripId);
+                      }}
+                      disabled={loading}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 cursor-pointer"
+                    >
+                      Book on Selected Trip #{selectedTripId}
+                    </button>
+                  ) : null}
+
                   <button
                     onClick={() => {
                       setSuitableDrawerOpen(false);
-                      handleAllocate(selectedOrderForSuitable.order_id);
+                      handleAllocate(selectedOrderForSuitable.order_id, null);
                     }}
                     disabled={suitableTripsList.length === 0 || loading}
-                    className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-md shadow-green-600/20"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-md shadow-green-600/20 cursor-pointer"
+                    title="Auto-spill across consecutive trains chronologically"
                   >
-                    Allocate Now
+                    <Split className="h-3.5 w-3.5" />
+                    <span>Auto Multi-Trip Spillover</span>
                   </button>
                 </div>
               </div>
