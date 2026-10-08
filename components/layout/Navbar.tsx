@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
+import { usePathname } from "next/navigation";
 import { Menu, X, Train, ArrowRight } from "lucide-react";
 import Button from "@/components/ui/Button";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/notifications/AlertsSidebar";
 
 export default function Navbar() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,7 +35,7 @@ export default function Navbar() {
       }
     }
     checkAuth();
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     function onScroll() {
