@@ -522,13 +522,25 @@ export default function OrdersPage() {
                           <StatusPill status={order.status} />
                         </td>
                         <td className="py-4 px-6 text-right">
-                          <Link
-                            href={`/orders/${order.id}/track`}
-                            className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 hover:text-green-800 transition-colors"
-                          >
-                            Track
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            {isLogisticsStaff && order.status === "pending" && (
+                              <button
+                                onClick={() => setSubCategory("rail")}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl shadow-xs transition-all cursor-pointer"
+                                title="Allocate train carriage slot (Feature 4.2)"
+                              >
+                                <Split className="h-3.5 w-3.5" />
+                                <span>Allocate Train</span>
+                              </button>
+                            )}
+                            <Link
+                              href={`/orders/${order.id}/track`}
+                              className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 hover:text-green-800 transition-colors"
+                            >
+                              Track
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -557,14 +569,25 @@ export default function OrdersPage() {
                       <div>Dispatched: {order.date} ({order.trainSlot})</div>
                     </div>
 
-                    <div className="pt-2 flex justify-between items-center">
+                    <div className="pt-2 flex justify-between items-center gap-2">
                       <span className="text-xs font-semibold text-text-heading">
                         Rs. {order.amount.toLocaleString()}
                       </span>
-                      <Button variant="secondary" size="sm" href={`/orders/${order.id}/track`}>
-                        Live Tracking
-                        <ArrowRight className="h-3 w-3" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {isLogisticsStaff && order.status === "pending" && (
+                          <button
+                            onClick={() => setSubCategory("rail")}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                          >
+                            <Split className="h-3 w-3" />
+                            Allocate
+                          </button>
+                        )}
+                        <Button variant="secondary" size="sm" href={`/orders/${order.id}/track`}>
+                          Live Tracking
+                          <ArrowRight className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -572,6 +595,8 @@ export default function OrdersPage() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* Slide-over Logistics Alerts & History Sidebar Drawer */}
