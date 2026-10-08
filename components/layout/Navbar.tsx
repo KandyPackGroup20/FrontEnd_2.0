@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { usePathname } from "next/navigation";
-import { Menu, X, Train, ArrowRight } from "lucide-react";
+import { Menu, X, Train, ArrowRight, LogOut } from "lucide-react";
 import Button from "@/components/ui/Button";
 import {
   AlertsSidebar,
@@ -19,6 +19,16 @@ export default function Navbar() {
   const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" });
+    } catch {
+      // quiet fallback
+    }
+    setCurrentUser(null);
+    window.location.href = "/login";
+  }
 
   useEffect(() => {
     async function checkAuth() {
@@ -132,6 +142,14 @@ export default function Navbar() {
                     {currentUser.role}
                   </span>
                 </Link>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-xs font-semibold transition-colors cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>Sign Out</span>
+                </button>
               </>
             ) : (
               <>
@@ -198,9 +216,18 @@ export default function Navbar() {
             <hr className="my-2 border-surface-glass-border" />
             <div className="flex flex-col gap-2">
               {currentUser ? (
-                <Button variant="secondary" href="/profile" id="nav-mobile-profile">
-                  Profile ({currentUser.name.split(" ")[0]})
-                </Button>
+                <>
+                  <Button variant="secondary" href="/profile" id="nav-mobile-profile">
+                    Profile ({currentUser.name.split(" ")[0]})
+                  </Button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 font-semibold text-sm transition-colors cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </>
               ) : (
                 <>
                   <Button variant="secondary" href="/login" id="nav-mobile-sign-in">

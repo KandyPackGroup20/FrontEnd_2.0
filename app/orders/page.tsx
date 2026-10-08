@@ -13,10 +13,13 @@ import {
   Package,
   MapPin,
   Loader2,
+  LogOut,
+  Split,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import RailManagement from "@/components/rail/RailManagement";
 import {
   AlertsSidebar,
   NotificationBellButton,
@@ -125,6 +128,16 @@ export default function OrdersPage() {
   const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
+  const [subCategory, setSubCategory] = useState<"dispatches" | "rail">("dispatches");
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" });
+    } catch {
+      // quiet fallback
+    }
+    window.location.href = "/login";
+  }
 
   const loadUserSession = useCallback(async () => {
     try {
@@ -239,6 +252,15 @@ export default function OrdersPage() {
           >
             {currentUser ? currentUser.name.split(" ")[0] : "Profile"}
           </Link>
+          {currentUser && (
+            <button
+              onClick={handleLogout}
+              className="text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Sign Out
+            </button>
+          )}
         </div>
       </div>
 
@@ -275,7 +297,44 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {/* Live Logistics Manager Alerts Banner - Strictly for authenticated Logistics Staff */}
+        {/* Sub-Category Switcher for Logistics Manager */}
+        {isLogisticsStaff && (
+          <div className="mb-8 flex flex-wrap items-center gap-3 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border border-white/60 shadow-xs max-w-fit">
+            <button
+              onClick={() => setSubCategory("dispatches")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                subCategory === "dispatches"
+                  ? "bg-green-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+              }`}
+            >
+              <Package className="h-4 w-4" />
+              <span>Shipment Dispatches</span>
+            </button>
+            <button
+              onClick={() => setSubCategory("rail")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                subCategory === "rail"
+                  ? "bg-green-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+              }`}
+            >
+              <Train className="h-4 w-4" />
+              <span>Rail Capacity & Allocation (Feature 4.2)</span>
+              <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">
+                LM Portal
+              </span>
+            </button>
+          </div>
+        )}
+
+        {subCategory === "rail" ? (
+          <div className="-mt-16">
+            <RailManagement initialTab="pending" />
+          </div>
+        ) : (
+          <>
+            {/* Live Logistics Manager Alerts Banner - Strictly for authenticated Logistics Staff */}
         {isLogisticsStaff && notifications.length > 0 && showNotifications && (
           <div className="mb-6 rounded-2xl bg-emerald-50/90 border border-emerald-300/80 p-4 shadow-xs">
             <div className="flex items-center justify-between mb-2">

@@ -60,11 +60,7 @@ function LoginForm() {
 
       setSuccess(true);
       setTimeout(() => {
-        if (data?.role === "LOGISTICS_MGR") {
-          router.push("/admin/rail");
-        } else if (data?.role === "DISPATCHER") {
-          router.push("/admin/roster");
-        } else if (data?.role === "SUPERADMIN" || data?.force_password_reset) {
+        if (data?.role === "SUPERADMIN" || data?.force_password_reset) {
           router.push("/profile");
         } else {
           router.push(redirectTarget);
