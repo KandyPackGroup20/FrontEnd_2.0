@@ -88,23 +88,20 @@ def test_full_lifecycle():
     })
     assert st == 200
 
-    delivery_date = (datetime.datetime.now() + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-
-    # Order A: Fits in one trip (Quantity 10 -> 10 * 0.05 = 0.5 space units)
-    st, res_a = cust.request("POST", "/api/v1/orders", {
-        "destination_hub": "CMB",
-        "recipient_name": "Lanka Retail Colombo",
-        "recipient_phone": "0771234567",
-        "delivery_address": "123 Galle Road, Colombo 03",
-        "booking_date": delivery_date,
-        "weight_kg": 50.0,
-        "items": [{"product_id": 1, "quantity": 10}]
+    # Create Trip 1 for Colombo with capacity 25.0
+    dep_a = (datetime.datetime.now() + datetime.timedelta(days=2)).strftime("%Y-%m-%dT10:00:00")
+    arr_a = (datetime.datetime.now() + datetime.timedelta(days=2, hours=4)).strftime("%Y-%m-%dT14:00:00")
+    st, res_ta = lm.request("POST", "/api/v1/rail/trips", {
+        "origin_station_id": 7,
+        "destination_station_id": 1,
+        "departure_datetime": dep_a,
+        "arrival_datetime": arr_a,
+        "total_capacity": 25.0
     })
-    print(f"Order A (fits-one-trip) placed: HTTP {st}, Order ID #{res_a.get('order_id')}")
-    assert st == 201, f"Failed to place Order A: {res_a}"
-    order_a_id = res_a["order_id"]
+    assert st == 201
+    trip_a_id = res_ta["trip_id"]
 
-    # Create a 2nd trip for Colombo so spillover can happen
+    # Create Trip 2 for Colombo with capacity 10.0
     dep_b = (datetime.datetime.now() + datetime.timedelta(days=3)).strftime("%Y-%m-%dT10:00:00")
     arr_b = (datetime.datetime.now() + datetime.timedelta(days=3, hours=4)).strftime("%Y-%m-%dT14:00:00")
     st, res_tb = lm.request("POST", "/api/v1/rail/trips", {
@@ -112,49 +109,51 @@ def test_full_lifecycle():
         "destination_station_id": 1,
         "departure_datetime": dep_b,
         "arrival_datetime": arr_b,
-        "total_capacity": 5.0
+        "total_capacity": 10.0
     })
     assert st == 201
     trip_b_id = res_tb["trip_id"]
 
-    # Create 2 trips for Matara (Station #4)
-    dep_c1 = (datetime.datetime.now() + datetime.timedelta(days=4)).strftime("%Y-%m-%dT10:00:00")
-    arr_c1 = (datetime.datetime.now() + datetime.timedelta(days=4, hours=4)).strftime("%Y-%m-%dT14:00:00")
-    dep_c2 = (datetime.datetime.now() + datetime.timedelta(days=5)).strftime("%Y-%m-%dT10:00:00")
-    arr_c2 = (datetime.datetime.now() + datetime.timedelta(days=5, hours=4)).strftime("%Y-%m-%dT14:00:00")
-    
-    st, r1 = lm.request("POST", "/api/v1/rail/trips", {
-        "origin_station_id": 7, "destination_station_id": 4, # Matara
-        "departure_datetime": dep_c1, "arrival_datetime": arr_c1, "total_capacity": 2.0
-    })
-    st, r2 = lm.request("POST", "/api/v1/rail/trips", {
-        "origin_station_id": 7, "destination_station_id": 4, # Matara
-        "departure_datetime": dep_c2, "arrival_datetime": arr_c2, "total_capacity": 10.0
-    })
+    # Define delivery date 7 days ahead
+    delivery_date = (datetime.datetime.now() + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
 
-    # Order B for Matara (needing 4.0 space units: 80 * 0.05 = 4.0 > 2.0)
-    st, res_b = cust.request("POST", "/api/v1/orders", {
-        "destination_hub": "MAT",
-        "recipient_name": "Matara Wholesale",
-        "recipient_phone": "0779988776",
-        "delivery_address": "45 Beach Road, Matara",
+    # Order A: Fits in one trip (Quantity 200 -> 200 * 0.05 = 10.0 space units out of 25.0 on Trip A)
+    st, res_a = cust.request("POST", "/api/v1/orders", {
+        "destination_hub": "CMB",
+        "recipient_name": "Lanka Retail Colombo",
+        "recipient_phone": "0771234567",
+        "delivery_address": "123 Galle Road, Colombo 03",
         "booking_date": delivery_date,
-        "weight_kg": 100.0,
-        "items": [{"product_id": 1, "quantity": 80}]
+        "weight_kg": 250.0,
+        "items": [{"product_id": 1, "quantity": 200}]
+    })
+    print(f"Order A (fits-one-trip) placed: HTTP {st}, Order ID #{res_a.get('order_id')}")
+    assert st == 201, f"Failed to place Order A: {res_a}"
+    order_a_id = res_a["order_id"]
+
+    # Order B: Spillover order (Quantity 400 -> 400 * 0.05 = 20.0 space units. Trip A only has 15.0 left, Trip B has 10.0 -> spills over)
+    st, res_b = cust.request("POST", "/api/v1/orders", {
+        "destination_hub": "CMB",
+        "recipient_name": "Colombo Wholesale",
+        "recipient_phone": "0779988776",
+        "delivery_address": "45 Beach Road, Colombo",
+        "booking_date": delivery_date,
+        "weight_kg": 500.0,
+        "items": [{"product_id": 1, "quantity": 400}]
     })
     print(f"Order B (spillover) placed: HTTP {st}, Order ID #{res_b.get('order_id')}")
     assert st == 201
     order_b_id = res_b["order_id"]
 
-    # Order C: Too-big order (1000 units = 50.0 space units to Matara, but only 2 + 10 = 12 total capacity exists)
+    # Order C: Too-big order (Quantity 5000 -> 5000 * 0.05 = 250 space units, exceeding all available trips)
     st, res_c = cust.request("POST", "/api/v1/orders", {
-        "destination_hub": "MAT",
-        "recipient_name": "Matara Mega Mart",
+        "destination_hub": "CMB",
+        "recipient_name": "Colombo Mega Mart",
         "recipient_phone": "0775544332",
-        "delivery_address": "88 City Center, Matara",
+        "delivery_address": "88 City Center, Colombo",
         "booking_date": delivery_date,
-        "weight_kg": 500.0,
-        "items": [{"product_id": 1, "quantity": 1000}]
+        "weight_kg": 2500.0,
+        "items": [{"product_id": 1, "quantity": 5000}]
     })
     print(f"Order C (too-big order) placed: HTTP {st}, Order ID #{res_c.get('order_id')}")
     assert st == 201
