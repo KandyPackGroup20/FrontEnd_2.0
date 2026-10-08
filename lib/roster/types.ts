@@ -146,5 +146,5 @@ export function canReadRoster(role: string): boolean {
 }
 
 export function canAssignRoster(role: string): boolean {
-  return role === "DISPATCHER" || role === "SUPERADMIN";
+  return role === "DISPATCHER" || role === "SUPERADMIN" || role === "LOGISTICS_MGR";
 }

@@ -561,21 +561,21 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
       <div className="relative z-10 max-w-7xl mx-auto space-y-6">
 
         {/* Header Bar */}
-        <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 flex items-center justify-center text-white shadow-md shadow-green-600/20">
-              <Train className="h-7 w-7" />
+        <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 flex items-center justify-center text-white shadow-md shadow-green-600/20">
+              <Train className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
                   Rail Capacity & Allocation
-                </h1>
-                <span className="text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2.5 py-0.5 rounded-full">
-                  Feature 4.2 Active
+                </h2>
+                <span className="text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
+                  Operational
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Multi-Trip Carriage Scheduling Engine • Kandy Central Goods Yard Mainline Corridor
               </p>
             </div>
@@ -627,7 +627,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
               <span className="text-xs text-slate-500">active ({totalTripsCount} total)</span>
             </div>
             <div className="mt-2 text-xs text-green-700 font-medium flex items-center gap-1">
-              <span>View & Manage Trips (LM-01/02)</span>
+              <span>View & Manage Trips</span>
               <ChevronRight className="h-3 w-3" />
             </div>
           </div>
@@ -692,7 +692,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
               <span className="text-sm font-bold text-slate-900">Allocation Breakdown</span>
             </div>
             <div className="mt-2 text-xs text-blue-700 font-medium flex items-center gap-1">
-              <span>Inspect legs & reverse slots (LM-18/19)</span>
+              <span>Inspect Legs & Reverse Slots</span>
               <ChevronRight className="h-3 w-3" />
             </div>
           </div>
@@ -729,11 +729,11 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2 overflow-x-auto">
           {[
-            { id: "trips", label: "Train Trips (LM-01/02)", count: trips.length, icon: Train },
-            { id: "pending", label: "Pending Orders (LM-06)", count: pendingOrders.length, icon: Layers },
-            { id: "breakdown", label: "Allocation Breakdown (LM-19/18)", icon: Split },
+            { id: "trips", label: "Train Trips", count: trips.length, icon: Train },
+            { id: "pending", label: "Pending Orders", count: pendingOrders.length, icon: Layers },
+            { id: "breakdown", label: "Allocation Breakdown", icon: Split },
             { id: "schedules", label: "Live Schedule & Cache", icon: Calendar },
-            { id: "audit", label: "Rail Audit Log (LM-23)", icon: History },
+            { id: "audit", label: "Rail Audit Log", icon: History },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -862,7 +862,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                                 <button
                                   onClick={() => handleViewTripConsignments(t.trip_id)}
                                   className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
-                                  title="View Consignments Manifest (LM-20)"
+                                  title="View Consignments Manifest"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </button>
@@ -875,7 +875,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                                     setEditArrival(t.arrival_datetime.replace(" ", "T").slice(0, 16));
                                   }}
                                   className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
-                                  title="Edit Trip Capacity (LM-02)"
+                                  title="Edit Trip Capacity"
                                 >
                                   <Layers className="h-4 w-4" />
                                 </button>
@@ -884,7 +884,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                                   <button
                                     onClick={() => handleCancelTrip(t.trip_id)}
                                     className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer"
-                                    title="Cancel Train Trip (LM-02)"
+                                    title="Cancel Train Trip"
                                   >
                                     <XCircle className="h-4 w-4" />
                                   </button>
@@ -892,7 +892,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                                   <button
                                     onClick={() => handleActivateTrip(t.trip_id)}
                                     className="p-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 transition-colors cursor-pointer"
-                                    title="Activate Trip (LM-02)"
+                                    title="Activate Trip"
                                   >
                                     <CheckCircle2 className="h-4 w-4" />
                                   </button>
@@ -918,7 +918,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
             <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">Orders Awaiting Train Allocation (LM-06)</h2>
+                  <h2 className="text-xl font-bold text-slate-900">Orders Awaiting Train Allocation</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Orders in status <code className="text-amber-700 font-mono font-semibold">PENDING_RAIL_SCHEDULING</code> eligible for train carriage booking
                   </p>
@@ -1008,9 +1008,9 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
             <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">Order Allocation Breakdown (LM-19)</h2>
+                  <h2 className="text-xl font-bold text-slate-900">Order Allocation Breakdown</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Trip-by-trip wagon distribution, multi-trip spillover visualisation, and capacity reversal (LM-18)
+                    Trip-by-trip wagon distribution, multi-trip spillover visualisation, and capacity reversal
                   </p>
                 </div>
               </div>
@@ -1064,7 +1064,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold transition-all cursor-pointer"
                       >
                         <Undo2 className="h-4 w-4 text-red-600" />
-                        <span>Reverse Allocation (LM-18)</span>
+                        <span>Reverse Allocation</span>
                       </button>
                     </div>
 
@@ -1176,7 +1176,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
             <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">Immutable Rail Audit Trail (LM-23)</h2>
+                  <h2 className="text-xl font-bold text-slate-900">Immutable Rail Audit Trail</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Tamper-proof logs recording all train creation, allocation, reversal, and cancellation events
                   </p>
@@ -1248,7 +1248,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
               <form onSubmit={handleCreateTrip} className="space-y-4 text-xs">
                 <div>
-                  <label className="block text-slate-600 font-semibold mb-1">Origin Station (LM-03)</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Origin Station</label>
                   <input
                     type="text"
                     disabled

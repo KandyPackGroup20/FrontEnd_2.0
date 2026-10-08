@@ -72,7 +72,7 @@ export default function Navbar() {
     ...(currentUser && ["LOGISTICS_MGR", "SUPERADMIN"].includes(currentUser.role)
       ? [{ label: "Rail Management", href: "/admin/rail" }]
       : []),
-    ...(currentUser && ["DISPATCHER", "SUPERADMIN"].includes(currentUser.role)
+    ...(currentUser && ["DISPATCHER", "SUPERADMIN", "LOGISTICS_MGR"].includes(currentUser.role)
       ? [{ label: "Truck Roster", href: "/admin/roster" }]
       : []),
   ];

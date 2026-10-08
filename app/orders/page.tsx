@@ -15,11 +15,13 @@ import {
   Loader2,
   LogOut,
   Split,
+  Truck,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
 import RailManagement from "@/components/rail/RailManagement";
+import RosterOverview from "@/components/roster/RosterOverview";
 import {
   AlertsSidebar,
   NotificationBellButton,
@@ -128,7 +130,7 @@ export default function OrdersPage() {
   const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
-  const [subCategory, setSubCategory] = useState<"dispatches" | "rail">("dispatches");
+  const [subCategory, setSubCategory] = useState<"dispatches" | "rail" | "roster">("dispatches");
 
   async function handleLogout() {
     try {
@@ -269,10 +271,18 @@ export default function OrdersPage() {
         <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-text-heading">
-              Shipment History
+              {subCategory === "rail"
+                ? "Rail Capacity & Allocation"
+                : subCategory === "roster"
+                ? "Truck Roster & Fleet"
+                : "Shipment History"}
             </h1>
             <p className="text-sm text-text-muted mt-1">
-              Track and review all your rail freight consignments dispatched from Kandy.
+              {subCategory === "rail"
+                ? "Schedule train trips, allocate freight wagon capacity, and manage multi-trip cargo spillover."
+                : subCategory === "roster"
+                ? "Review delivery schedules, trucks, and the delivery staff assigned to each route."
+                : "Track and review all your rail freight consignments dispatched from Kandy."}
             </p>
           </div>
 
@@ -299,7 +309,7 @@ export default function OrdersPage() {
 
         {/* Sub-Category Switcher for Logistics Manager */}
         {isLogisticsStaff && (
-          <div className="mb-8 flex flex-wrap items-center gap-3 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border border-white/60 shadow-xs max-w-fit">
+          <div className="mb-6 flex flex-wrap items-center gap-3 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border border-white/60 shadow-xs max-w-fit">
             <button
               onClick={() => setSubCategory("dispatches")}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -320,17 +330,32 @@ export default function OrdersPage() {
               }`}
             >
               <Train className="h-4 w-4" />
-              <span>Rail Capacity & Allocation (Feature 4.2)</span>
+              <span>Rail Capacity & Allocation</span>
               <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">
                 LM Portal
               </span>
+            </button>
+            <button
+              onClick={() => setSubCategory("roster")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                subCategory === "roster"
+                  ? "bg-green-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+              }`}
+            >
+              <Truck className="h-4 w-4" />
+              <span>Truck Roster</span>
             </button>
           </div>
         )}
 
         {subCategory === "rail" ? (
-          <div className="-mt-16">
+          <div className="mt-2">
             <RailManagement initialTab="pending" />
+          </div>
+        ) : subCategory === "roster" ? (
+          <div className="mt-2 -mx-6 sm:-mx-12 lg:-mx-16">
+            <RosterOverview />
           </div>
         ) : (
           <>
@@ -527,7 +552,7 @@ export default function OrdersPage() {
                               <button
                                 onClick={() => setSubCategory("rail")}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl shadow-xs transition-all cursor-pointer"
-                                title="Allocate train carriage slot (Feature 4.2)"
+                                title="Allocate train carriage slot"
                               >
                                 <Split className="h-3.5 w-3.5" />
                                 <span>Allocate Train</span>
