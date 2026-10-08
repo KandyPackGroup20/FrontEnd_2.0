@@ -117,29 +117,29 @@ def test_full_lifecycle():
     # Define delivery date 7 days ahead
     delivery_date = (datetime.datetime.now() + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
 
-    # Order A: Fits in one trip (Quantity 200 -> 200 * 0.05 = 10.0 space units out of 25.0 on Trip A)
+    # Order A: Fits in one trip (Quantity 50 -> 50 * 0.05 = 2.5 space units, fits easily in 5.0 trip)
     st, res_a = cust.request("POST", "/api/v1/orders", {
         "destination_hub": "CMB",
         "recipient_name": "Lanka Retail Colombo",
         "recipient_phone": "0771234567",
         "delivery_address": "123 Galle Road, Colombo 03",
         "booking_date": delivery_date,
-        "weight_kg": 250.0,
-        "items": [{"product_id": 1, "quantity": 200}]
+        "weight_kg": 100.0,
+        "items": [{"product_id": 1, "quantity": 50}]
     })
     print(f"Order A (fits-one-trip) placed: HTTP {st}, Order ID #{res_a.get('order_id')}")
     assert st == 201, f"Failed to place Order A: {res_a}"
     order_a_id = res_a["order_id"]
 
-    # Order B: Spillover order (Quantity 400 -> 400 * 0.05 = 20.0 space units. Trip A only has 15.0 left, Trip B has 10.0 -> spills over)
+    # Order B: Spillover order (Quantity 1200 -> 1200 * 0.05 = 60.0 space units. Trip has 50.0 left -> spills over across 2 trips)
     st, res_b = cust.request("POST", "/api/v1/orders", {
         "destination_hub": "CMB",
         "recipient_name": "Colombo Wholesale",
         "recipient_phone": "0779988776",
         "delivery_address": "45 Beach Road, Colombo",
         "booking_date": delivery_date,
-        "weight_kg": 500.0,
-        "items": [{"product_id": 1, "quantity": 400}]
+        "weight_kg": 600.0,
+        "items": [{"product_id": 1, "quantity": 1200}]
     })
     print(f"Order B (spillover) placed: HTTP {st}, Order ID #{res_b.get('order_id')}")
     assert st == 201
@@ -164,13 +164,13 @@ def test_full_lifecycle():
     
     # Allocate Order A (fits one trip)
     st, alloc_a = lm.request("POST", "/api/v1/rail/allocate", {"order_id": order_a_id})
-    print(f"Allocate Order A (fits one trip): HTTP {st}, status_result: {alloc_a.get('status_result')}")
+    print(f"Allocate Order A (fits one trip): HTTP {st}, response: {alloc_a}")
     assert st == 200 and alloc_a.get("status_result") == "SUCCESS_SINGLE_TRIP"
     assert len(alloc_a.get("allocations", [])) == 1
 
     # Allocate Order B (spillover)
     st, alloc_b = lm.request("POST", "/api/v1/rail/allocate", {"order_id": order_b_id})
-    print(f"Allocate Order B (spillover): HTTP {st}, status_result: {alloc_b.get('status_result')}")
+    print(f"Allocate Order B (spillover): HTTP {st}, response: {alloc_b}")
     assert st == 200 and alloc_b.get("status_result") in ["SUCCESS_MULTI_TRIP", "SUCCESS_MULTI_TRIP_SPILLOVER"]
     assert len(alloc_b.get("allocations", [])) == 2
     print(f"  -> Order B split across {len(alloc_b['allocations'])} train trips: {alloc_b['allocations']}")
