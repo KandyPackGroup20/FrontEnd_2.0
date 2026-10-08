@@ -21,7 +21,13 @@ import {
   Eye,
   XCircle,
   Lock,
+  PackageCheck,
+  Sparkles,
+  TrendingUp,
+  Search,
+  Boxes,
 } from "lucide-react";
+import GradientBlobs from "@/components/ui/GradientBlobs";
 
 interface TrainTrip {
   trip_id: number;
@@ -58,19 +64,32 @@ interface PendingOrder {
     product_name: string;
     quantity: number;
     unit_price_at_order: number;
-    space_consumption_rate: number;
+    space_rate: number;
     required_space: number;
   }>;
 }
 
-interface AllocationRecord {
-  allocation_id: number;
-  order_id?: number;
-  order_item_id?: number;
+interface SuitableTripOption {
   trip_id: number;
   departure_datetime: string;
-  allocated_quantity: number;
-  allocated_space: number;
+  arrival_datetime: string;
+  total_capacity: number;
+  used_space: number;
+  remaining_space: number;
+  utilisation_pct: number;
+}
+
+interface OrderAllocationBreakdown {
+  order_id: number;
+  status_result?: string;
+  allocations: Array<{
+    allocation_id: number;
+    order_item_id: number;
+    trip_id: number;
+    departure_datetime: string;
+    allocated_quantity: number;
+    allocated_space: number;
+  }>;
 }
 
 interface TripAllocationItem {
@@ -92,9 +111,9 @@ interface AuditLogEntry {
   user_role: string;
   action: string;
   entity_id: number;
+  entity_name: string;
   outcome: string;
   occurred_at: string;
-  entity_name: string;
 }
 
 interface RailManagementProps {
@@ -102,31 +121,37 @@ interface RailManagementProps {
 }
 
 export default function RailManagement({ initialTab = "trips" }: RailManagementProps) {
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [authChecking, setAuthChecking] = useState(true);
+  const [activeTab, setActiveTab] = useState<"trips" | "pending" | "breakdown" | "schedules" | "audit">(initialTab);
+  const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
 
-  // Data states
+  // Trips data
   const [trips, setTrips] = useState<TrainTrip[]>([]);
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [schedules, setSchedules] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<TrainTrip[]>([]);
   const [cacheStatus, setCacheStatus] = useState<string>("MISS");
-  const [loading, setLoading] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
-  // Modals & Panels
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editTrip, setEditTrip] = useState<TrainTrip | null>(null);
-  const [selectedTripConsignments, setSelectedTripConsignments] = useState<{ tripId: number; items: TripAllocationItem[] } | null>(null);
-  const [suitableTripsModal, setSuitableTripsModal] = useState<{ orderId: number; trips: any[] } | null>(null);
-  const [breakdownOrderId, setBreakdownOrderId] = useState<number | "">("");
-  const [orderAllocations, setOrderAllocations] = useState<{ orderId: number; allocations: AllocationRecord[] } | null>(null);
-
-  // Action status message
+  // UI state
+  const [loading, setLoading] = useState<boolean>(false);
   const [alertBanner, setAlertBanner] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
 
-  // New Trip Form state
-  const [newTripDestination, setNewTripDestination] = useState<number>(1); // Colombo default
+  // Inspect suitable trips drawer
+  const [selectedOrderForSuitable, setSelectedOrderForSuitable] = useState<PendingOrder | null>(null);
+  const [suitableTripsList, setSuitableTripsList] = useState<SuitableTripOption[]>([]);
+  const [suitableDrawerOpen, setSuitableDrawerOpen] = useState<boolean>(false);
+
+  // Allocation Breakdown state
+  const [breakdownOrderId, setBreakdownOrderId] = useState<number | "">("");
+  const [orderAllocations, setOrderAllocations] = useState<{ orderId: number; allocations: any[] } | null>(null);
+
+  // Trip Consignments Modal
+  const [tripConsignmentsModal, setTripConsignmentsModal] = useState<{ tripId: number; items: TripAllocationItem[] } | null>(null);
+
+  // Create Trip Modal state
+  const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
+  const [editTrip, setEditTrip] = useState<TrainTrip | null>(null);
+  const [newTripDestination, setNewTripDestination] = useState<number>(1);
   const [newTripDeparture, setNewTripDeparture] = useState<string>("");
   const [newTripArrival, setNewTripArrival] = useState<string>("");
   const [newTripCapacity, setNewTripCapacity] = useState<number>(50);
@@ -226,9 +251,12 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
   // Auth gate check
   if (authChecking) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-300">
-        <RefreshCw className="h-6 w-6 animate-spin text-green-500 mr-3" />
-        <span>Verifying Logistics Manager credentials...</span>
+      <div className="relative min-h-screen flex items-center justify-center p-6 bg-[#F5FAF7] text-slate-700">
+        <GradientBlobs />
+        <div className="bg-white/80 backdrop-blur-xl border border-white/60 p-6 rounded-2xl shadow-sm flex items-center gap-3">
+          <RefreshCw className="h-5 w-5 animate-spin text-green-600" />
+          <span className="text-sm font-medium">Verifying Logistics Manager authorization...</span>
+        </div>
       </div>
     );
   }
@@ -236,19 +264,30 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
   const isAuthorized = currentUser && ["LOGISTICS_MGR", "SUPERADMIN"].includes(currentUser.role);
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 max-w-md text-center shadow-2xl">
-          <ShieldAlert className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">403 Forbidden - Access Denied</h2>
-          <p className="text-sm text-slate-400 mb-6">
+      <div className="relative min-h-screen flex items-center justify-center p-6 bg-[#F5FAF7]">
+        <GradientBlobs />
+        <div className="relative z-10 bg-white/90 backdrop-blur-2xl border border-red-200 rounded-3xl p-8 max-w-md text-center shadow-xl">
+          <div className="h-14 w-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-100">
+            <ShieldAlert className="h-7 w-7" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">403 Forbidden - Access Denied</h2>
+          <p className="text-sm text-slate-600 mb-6 leading-relaxed">
             The Rail Capacity & Allocation portal is restricted exclusively to <strong>Logistics Managers</strong> and <strong>Superadmins</strong>.
           </p>
-          <Link
-            href="/orders"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-all"
-          >
-            Back to Orders Dashboard
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm shadow-sm transition-all"
+            >
+              Log in as Logistics Manager
+            </Link>
+            <Link
+              href="/orders"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-all"
+            >
+              Back to Orders Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -299,7 +338,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
     try {
       const res = await fetch(`/api/v1/rail/trips/${editTrip.trip_id}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           total_capacity: Number(editCapacity),
@@ -331,13 +370,13 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
     try {
       const res = await fetch(`/api/v1/rail/trips/${tripId}/cancel`, {
-        method: "PATCH",
+        method: "POST",
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "Failed to cancel trip.");
       }
-      setAlertBanner({ type: "success", message: data.message || `Trip #${tripId} cancelled.` });
+      setAlertBanner({ type: "info", message: data.message || `Train trip #${tripId} cancelled.` });
       refreshAll();
     } catch (err: any) {
       setAlertBanner({ type: "error", message: err.message });
@@ -353,13 +392,13 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
     try {
       const res = await fetch(`/api/v1/rail/trips/${tripId}/activate`, {
-        method: "PATCH",
+        method: "POST",
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || "Failed to activate trip.");
       }
-      setAlertBanner({ type: "success", message: data.message || `Trip #${tripId} activated.` });
+      setAlertBanner({ type: "success", message: data.message || `Train trip #${tripId} reactivated.` });
       refreshAll();
     } catch (err: any) {
       setAlertBanner({ type: "error", message: err.message });
@@ -368,16 +407,21 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }
 
-  // 5. Inspect Suitable Trips (LM-03/04/15)
+  // 5. Inspect Suitable Trips (LM-03, LM-04, LM-15)
   async function handleInspectSuitableTrips(orderId: number) {
     setLoading(true);
+    setAlertBanner(null);
+    const ord = pendingOrders.find((o) => o.order_id === orderId);
+    setSelectedOrderForSuitable(ord || null);
+
     try {
       const res = await fetch(`/api/v1/rail/orders/${orderId}/suitable-trips`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "Failed to retrieve suitable trips.");
+        throw new Error(data.detail || "Failed to query suitable trips.");
       }
-      setSuitableTripsModal({ orderId, trips: data.suitable_trips || [] });
+      setSuitableTripsList(data.suitable_trips || []);
+      setSuitableDrawerOpen(true);
     } catch (err: any) {
       setAlertBanner({ type: "error", message: err.message });
     } finally {
@@ -385,7 +429,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }
 
-  // 6. Allocate Capacity (Stored Procedure sp_schedule_train_order)
+  // 6. Allocate Rail Capacity (LM-05, LM-07, LM-08, LM-09)
   async function handleAllocate(orderId: number) {
     setLoading(true);
     setAlertBanner(null);
@@ -403,13 +447,13 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         const errorDetail = data.detail || "Allocation failed";
         let humanMessage = errorDetail;
         if (errorDetail.includes("INSUFFICIENT_RAIL_CAPACITY")) {
-          humanMessage = "Allocation Rejected: Insufficient rail carriage capacity available before delivery date.";
+          humanMessage = "Allocation Rejected: Insufficient rail carriage capacity available before delivery cutoff date.";
         } else if (errorDetail.includes("ORDER_NOT_FOUND")) {
           humanMessage = "Order not found in database.";
         } else if (errorDetail.includes("INVALID_ORDER_STATUS")) {
           humanMessage = "Invalid order status. Order must be in PENDING_RAIL_SCHEDULING.";
         } else if (errorDetail.includes("DESTINATION_HUB_NOT_RESOLVED")) {
-          humanMessage = "Destination station hub could not be resolved from customer address.";
+          humanMessage = "Destination station hub could not be resolved from customer delivery address.";
         }
         setAlertBanner({ type: "error", message: humanMessage });
         return;
@@ -419,7 +463,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
       let outcomeText = `Order #${orderId} allocated successfully! Result: ${statusResult}`;
       if (statusResult === "SUCCESS_SINGLE_TRIP") {
         outcomeText = `Order #${orderId} scheduled successfully on a single train trip!`;
-      } else if (statusResult.includes("SPILLOVER") || statusResult === "SUCCESS_MULTI_TRIP") {
+      } else if (statusResult?.includes("SPILLOVER") || statusResult === "SUCCESS_MULTI_TRIP") {
         outcomeText = `Order #${orderId} scheduled with Multi-Trip Spillover across multiple train carriages!`;
       }
 
@@ -440,39 +484,45 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }
 
-  // 7. View Order Breakdown (LM-19)
+  // 7. Load Order Breakdown (LM-19)
   async function handleLoadOrderAllocations(orderId: number) {
-    if (!orderId) return;
     setLoading(true);
+    setAlertBanner(null);
+
     try {
       const res = await fetch(`/api/v1/rail/orders/${orderId}/allocations`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "Failed to load order allocations.");
+        throw new Error(data.detail || "Failed to load order allocation breakdown.");
       }
       setOrderAllocations({ orderId, allocations: data.allocations || [] });
     } catch (err: any) {
       setAlertBanner({ type: "error", message: err.message });
+      setOrderAllocations(null);
     } finally {
       setLoading(false);
     }
   }
 
-  // 8. Reverse Allocation / Reschedule (LM-18)
+  // 8. Reverse Allocation (LM-18)
   async function handleReverseAllocation(orderId: number) {
-    if (!confirm(`Are you sure you want to reverse rail allocations for Order #${orderId}? This will release the booked wagon capacity and return the order to PENDING_RAIL_SCHEDULING.`)) return;
+    if (!confirm(`Are you sure you want to reverse all train allocations for Order #${orderId}? This will free all reserved carriage slots.`)) return;
     setLoading(true);
     setAlertBanner(null);
 
     try {
-      const res = await fetch(`/api/v1/rail/orders/${orderId}/reverse`, {
+      const res = await fetch("/api/v1/rail/allocate/reverse", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId }),
       });
+
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "Failed to reverse rail allocation.");
+        throw new Error(data.detail || "Failed to reverse allocation.");
       }
-      setAlertBanner({ type: "success", message: data.message || `Order #${orderId} allocation reversed. Capacity released.` });
+
+      setAlertBanner({ type: "success", message: `Order #${orderId} allocation reversed. Reserved train capacity released.` });
       setOrderAllocations(null);
       refreshAll();
     } catch (err: any) {
@@ -482,42 +532,51 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }
 
-  // 9. View Trip Consignments (LM-20)
+  // 9. View Trip Consignments Manifest (LM-20)
   async function handleViewTripConsignments(tripId: number) {
     setLoading(true);
     try {
       const res = await fetch(`/api/v1/rail/trips/${tripId}/allocations`);
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Failed to load trip consignments.");
+      if (res.ok) {
+        setTripConsignmentsModal({ tripId, items: data.allocations || [] });
       }
-      setSelectedTripConsignments({ tripId, items: data.allocations || [] });
-    } catch (err: any) {
-      setAlertBanner({ type: "error", message: err.message });
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
+  // Calculations for KPI Cards
+  const totalTripsCount = trips.length;
+  const scheduledTripsCount = trips.filter((t) => t.status === "SCHEDULED").length;
+  const pendingOrdersCount = pendingOrders.length;
+  const totalPendingSpace = pendingOrders.reduce((acc, o) => acc + (o.total_required_space || 0), 0);
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="relative min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 bg-[#F5FAF7] text-slate-800">
+      <GradientBlobs />
+
+      <div className="relative z-10 max-w-7xl mx-auto space-y-6">
 
         {/* Header Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
+        <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-700 flex items-center justify-center text-white shadow-lg shadow-green-900/40">
-              <Train className="h-6 w-6" />
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 flex items-center justify-center text-white shadow-md shadow-green-600/20">
+              <Train className="h-7 w-7" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-white">Rail Capacity & Allocation</h1>
-                <span className="text-[11px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                  Rail Capacity & Allocation
+                </h1>
+                <span className="text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2.5 py-0.5 rounded-full">
                   Feature 4.2 Active
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Multi-Trip Carriage Scheduling Engine • Kandy Central Goods Yard Mainline
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Multi-Trip Carriage Scheduling Engine • Kandy Central Goods Yard Mainline Corridor
               </p>
             </div>
           </div>
@@ -526,10 +585,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
             <button
               onClick={refreshAll}
               disabled={loading}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200/80 shadow-sm transition-all cursor-pointer"
               title="Refresh all data"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 text-green-600 ${loading ? "animate-spin" : ""}`} />
               <span>Refresh</span>
             </button>
 
@@ -540,7 +599,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                 setNewTripCapacity(50);
                 setCreateModalOpen(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-bold shadow-lg shadow-green-900/30 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-md shadow-green-600/25 transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               <span>Create Train Trip</span>
@@ -548,28 +607,119 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
           </div>
         </div>
 
+        {/* Feature KPI Cards: Everything Visible Upfront */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Train Trips */}
+          <div
+            onClick={() => setActiveTab("trips")}
+            className={`bg-white/80 backdrop-blur-xl border rounded-2xl p-5 shadow-sm transition-all cursor-pointer hover:shadow-md ${
+              activeTab === "trips" ? "border-green-500 ring-2 ring-green-500/20" : "border-white/60 hover:border-slate-300"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Scheduled Trains</span>
+              <div className="h-8 w-8 rounded-xl bg-green-50 text-green-700 flex items-center justify-center">
+                <Train className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-slate-900">{scheduledTripsCount}</span>
+              <span className="text-xs text-slate-500">active ({totalTripsCount} total)</span>
+            </div>
+            <div className="mt-2 text-xs text-green-700 font-medium flex items-center gap-1">
+              <span>View & Manage Trips (LM-01/02)</span>
+              <ChevronRight className="h-3 w-3" />
+            </div>
+          </div>
+
+          {/* Card 2: Pending Orders */}
+          <div
+            onClick={() => setActiveTab("pending")}
+            className={`bg-white/80 backdrop-blur-xl border rounded-2xl p-5 shadow-sm transition-all cursor-pointer hover:shadow-md ${
+              activeTab === "pending" ? "border-green-500 ring-2 ring-green-500/20" : "border-white/60 hover:border-slate-300"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pending Orders</span>
+              <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Layers className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-3xl font-extrabold text-slate-900">{pendingOrdersCount}</span>
+              <span className="text-xs text-amber-700 font-medium">waiting for slot</span>
+            </div>
+            <div className="mt-2 text-xs text-slate-500 flex items-center gap-1">
+              <span>Req Space: <strong>{totalPendingSpace.toFixed(1)} units</strong></span>
+              <ChevronRight className="h-3 w-3 ml-auto text-amber-600" />
+            </div>
+          </div>
+
+          {/* Card 3: Spillover Engine */}
+          <div
+            onClick={() => setActiveTab("pending")}
+            className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-2xl p-5 shadow-sm hover:border-slate-300 transition-all cursor-pointer hover:shadow-md"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Spillover Engine</span>
+              <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Split className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-sm font-bold text-slate-900">Chronological Split</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Active</span>
+            </div>
+            <div className="mt-2 text-xs text-slate-500 leading-snug">
+              Auto-spills cargo across consecutive trains before deadline
+            </div>
+          </div>
+
+          {/* Card 4: Breakdown & Reschedule */}
+          <div
+            onClick={() => setActiveTab("breakdown")}
+            className={`bg-white/80 backdrop-blur-xl border rounded-2xl p-5 shadow-sm transition-all cursor-pointer hover:shadow-md ${
+              activeTab === "breakdown" ? "border-green-500 ring-2 ring-green-500/20" : "border-white/60 hover:border-slate-300"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Slot Inspector</span>
+              <div className="h-8 w-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Search className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-sm font-bold text-slate-900">Allocation Breakdown</span>
+            </div>
+            <div className="mt-2 text-xs text-blue-700 font-medium flex items-center gap-1">
+              <span>Inspect legs & reverse slots (LM-18/19)</span>
+              <ChevronRight className="h-3 w-3" />
+            </div>
+          </div>
+        </div>
+
         {/* Alert Banner */}
         {alertBanner && (
           <div
-            className={`p-4 rounded-2xl border flex items-start gap-3 backdrop-blur-md transition-all ${
+            className={`p-4 rounded-2xl border flex items-start gap-3 backdrop-blur-md transition-all shadow-sm ${
               alertBanner.type === "success"
-                ? "bg-emerald-950/60 border-emerald-500/30 text-emerald-200"
+                ? "bg-green-50/90 border-green-200 text-green-900"
                 : alertBanner.type === "error"
-                ? "bg-red-950/60 border-red-500/30 text-red-200"
-                : "bg-blue-950/60 border-blue-500/30 text-blue-200"
+                ? "bg-red-50/90 border-red-200 text-red-900"
+                : "bg-blue-50/90 border-blue-200 text-blue-900"
             }`}
           >
             {alertBanner.type === "success" ? (
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
             ) : alertBanner.type === "error" ? (
-              <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
             ) : (
-              <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+              <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
             )}
             <div className="flex-1 text-sm font-medium">{alertBanner.message}</div>
             <button
               onClick={() => setAlertBanner(null)}
-              className="text-white/60 hover:text-white text-xs cursor-pointer font-bold ml-2"
+              className="text-slate-400 hover:text-slate-700 text-sm cursor-pointer font-bold ml-2"
             >
               &times;
             </button>
@@ -577,7 +727,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto">
+        <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2 overflow-x-auto">
           {[
             { id: "trips", label: "Train Trips (LM-01/02)", count: trips.length, icon: Train },
             { id: "pending", label: "Pending Orders (LM-06)", count: pendingOrders.length, icon: Layers },
@@ -593,16 +743,16 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   active
-                    ? "bg-green-600 text-white shadow-md shadow-green-900/40"
-                    : "bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent"
+                    ? "bg-green-600 text-white shadow-sm"
+                    : "bg-white/80 text-slate-600 hover:text-green-700 hover:bg-green-50/60 border border-slate-200/60"
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-4 w-4" />
                 <span>{tab.label}</span>
                 {typeof tab.count === "number" && (
                   <span
-                    className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                      active ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400"
+                    className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
                     }`}
                   >
                     {tab.count}
@@ -618,23 +768,23 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* ======================================================== */}
         {activeTab === "trips" && (
           <div className="space-y-4">
-            <div className="bg-slate-900/70 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+            <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Scheduled Freight Trips</h2>
-                  <p className="text-xs text-slate-400">
-                    Real-time carriage capacity usage from <code className="text-green-400 font-mono">v_trip_capacity_usage</code>
+                  <h2 className="text-xl font-bold text-slate-900">Scheduled Freight Train Trips</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Real-time carriage capacity usage from view <code className="text-green-700 font-mono font-semibold">v_trip_capacity_usage</code>
                   </p>
                 </div>
-                <div className="text-xs text-slate-400">
-                  Showing <strong className="text-white">{trips.length}</strong> trips originating from Kandy Central Goods Yard
+                <div className="text-xs text-slate-500">
+                  Showing <strong className="text-slate-900">{trips.length}</strong> trips originating from Kandy Central Goods Yard
                 </div>
               </div>
 
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                    <tr className="border-b border-slate-200/80 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
                       <th className="py-3 px-3">Trip ID</th>
                       <th className="py-3 px-3">Corridor Route</th>
                       <th className="py-3 px-3">Departure</th>
@@ -645,10 +795,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                       <th className="py-3 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-slate-100">
                     {trips.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-8 text-center text-slate-400">
+                        <td colSpan={8} className="py-12 text-center text-slate-500">
                           No train trips currently scheduled. Click <strong>Create Train Trip</strong> above.
                         </td>
                       </tr>
@@ -657,64 +807,64 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                         const pct = Math.min(100, Math.max(0, Number(t.utilisation_pct) || 0));
                         const isFull = Number(t.remaining_space) <= 0.001;
                         return (
-                          <tr key={t.trip_id} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="py-3 px-3 font-mono font-bold text-white">#{t.trip_id}</td>
-                            <td className="py-3 px-3 font-medium text-slate-200">
-                              <span className="text-green-400 font-semibold">{t.origin_city}</span> &rarr;{" "}
-                              <span className="text-white font-semibold">{t.destination_city}</span>
+                          <tr key={t.trip_id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-3.5 px-3 font-mono font-bold text-slate-900">#{t.trip_id}</td>
+                            <td className="py-3.5 px-3 font-medium text-slate-800">
+                              <span className="text-green-700 font-semibold">{t.origin_city}</span> &rarr;{" "}
+                              <span className="text-slate-900 font-semibold">{t.destination_city}</span>
                             </td>
-                            <td className="py-3 px-3 text-slate-300">{t.departure_datetime}</td>
-                            <td className="py-3 px-3 text-slate-300">{t.arrival_datetime}</td>
-                            <td className="py-3 px-3">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-white">{Number(t.used_space).toFixed(1)}</span>
-                                <span className="text-slate-500">/</span>
-                                <span className="text-slate-400">{Number(t.total_capacity).toFixed(1)}</span>
-                                <span className="text-[10px] text-emerald-400 ml-1">
+                            <td className="py-3.5 px-3 text-slate-600">{t.departure_datetime}</td>
+                            <td className="py-3.5 px-3 text-slate-600">{t.arrival_datetime}</td>
+                            <td className="py-3.5 px-3">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-slate-900">{Number(t.used_space).toFixed(1)}</span>
+                                <span className="text-slate-400">/</span>
+                                <span className="text-slate-600">{Number(t.total_capacity).toFixed(1)}</span>
+                                <span className="text-[11px] text-green-700 font-medium ml-1">
                                   ({Number(t.remaining_space).toFixed(1)} avail)
                                 </span>
                               </div>
                             </td>
-                            <td className="py-3 px-3 min-w-[140px]">
+                            <td className="py-3.5 px-3 min-w-[140px]">
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
                                   <div
                                     className={`h-full rounded-full transition-all ${
                                       pct > 90
                                         ? "bg-red-500"
                                         : pct > 60
                                         ? "bg-amber-500"
-                                        : "bg-emerald-500"
+                                        : "bg-green-500"
                                     }`}
                                     style={{ width: `${pct}%` }}
                                   />
                                 </div>
-                                <span className="text-[10px] font-mono text-slate-300 w-9 text-right">
+                                <span className="text-[11px] font-mono text-slate-600 w-9 text-right font-semibold">
                                   {pct.toFixed(0)}%
                                 </span>
                               </div>
                             </td>
-                            <td className="py-3 px-3">
+                            <td className="py-3.5 px-3">
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                                   t.status === "SCHEDULED"
                                     ? isFull
-                                      ? "bg-amber-950 text-amber-300 border border-amber-500/30"
-                                      : "bg-emerald-950 text-emerald-300 border border-emerald-500/30"
-                                    : "bg-red-950 text-red-300 border border-red-500/30"
+                                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : "bg-green-50 text-green-700 border border-green-200"
+                                    : "bg-red-50 text-red-700 border border-red-200"
                                 }`}
                               >
                                 {t.status === "SCHEDULED" && isFull ? "FULL" : t.status}
                               </span>
                             </td>
-                            <td className="py-3 px-3 text-right">
+                            <td className="py-3.5 px-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 <button
                                   onClick={() => handleViewTripConsignments(t.trip_id)}
-                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                                   title="View Consignments Manifest (LM-20)"
                                 >
-                                  <Eye className="h-3.5 w-3.5" />
+                                  <Eye className="h-4 w-4" />
                                 </button>
 
                                 <button
@@ -724,27 +874,27 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                                     setEditDeparture(t.departure_datetime.replace(" ", "T").slice(0, 16));
                                     setEditArrival(t.arrival_datetime.replace(" ", "T").slice(0, 16));
                                   }}
-                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                                   title="Edit Trip Capacity (LM-02)"
                                 >
-                                  <Layers className="h-3.5 w-3.5" />
+                                  <Layers className="h-4 w-4" />
                                 </button>
 
                                 {t.status === "SCHEDULED" ? (
                                   <button
                                     onClick={() => handleCancelTrip(t.trip_id)}
-                                    className="p-1.5 rounded-lg bg-red-950/60 hover:bg-red-900 text-red-300 hover:text-red-100 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer"
                                     title="Cancel Train Trip (LM-02)"
                                   >
-                                    <XCircle className="h-3.5 w-3.5" />
+                                    <XCircle className="h-4 w-4" />
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => handleActivateTrip(t.trip_id)}
-                                    className="p-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 hover:text-emerald-100 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 transition-colors cursor-pointer"
                                     title="Activate Trip (LM-02)"
                                   >
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    <CheckCircle2 className="h-4 w-4" />
                                   </button>
                                 )}
                               </div>
@@ -765,50 +915,50 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* ======================================================== */}
         {activeTab === "pending" && (
           <div className="space-y-4">
-            <div className="bg-slate-900/70 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+            <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Orders Awaiting Train Allocation (LM-06)</h2>
-                  <p className="text-xs text-slate-400">
-                    Orders in status <code className="text-amber-400 font-mono">PENDING_RAIL_SCHEDULING</code> eligible for train carriage booking
+                  <h2 className="text-xl font-bold text-slate-900">Orders Awaiting Train Allocation (LM-06)</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Orders in status <code className="text-amber-700 font-mono font-semibold">PENDING_RAIL_SCHEDULING</code> eligible for train carriage booking
                   </p>
                 </div>
-                <div className="text-xs text-slate-400">
-                  <strong className="text-white">{pendingOrders.length}</strong> orders queued for dispatch
+                <div className="text-xs text-slate-500">
+                  <strong className="text-slate-900">{pendingOrders.length}</strong> customer orders queued for rail scheduling
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-5 space-y-3">
                 {pendingOrders.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400">
-                    <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2 opacity-80" />
-                    <p className="font-medium text-white">All orders are scheduled!</p>
-                    <p className="text-xs mt-1">No customer orders currently awaiting rail allocation.</p>
+                  <div className="py-16 text-center text-slate-500">
+                    <CheckCircle2 className="h-10 w-10 text-green-600 mx-auto mb-2 opacity-80" />
+                    <p className="font-semibold text-slate-900 text-base">All orders are scheduled!</p>
+                    <p className="text-xs mt-1">No customer orders currently awaiting rail carriage allocation.</p>
                   </div>
                 ) : (
                   pendingOrders.map((order) => (
                     <div
                       key={order.order_id}
-                      className="bg-slate-800/40 border border-white/5 hover:border-white/15 rounded-2xl p-4 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className="bg-white border border-slate-200/70 hover:border-green-300 rounded-2xl p-5 transition-all shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5"
                     >
-                      <div className="space-y-1.5 flex-1">
+                      <div className="space-y-2 flex-1">
                         <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-white text-sm">Order #{order.order_id}</span>
-                          <span className="text-xs font-semibold text-slate-200">{order.customer_name}</span>
-                          <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                          <span className="font-mono font-bold text-slate-900 text-sm">Order #{order.order_id}</span>
+                          <span className="text-xs font-semibold text-slate-700">{order.customer_name}</span>
+                          <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full font-bold">
                             PENDING SCHEDULING
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-500">
                           <div>
-                            Destination: <strong className="text-slate-200">{order.destination_city} Hub</strong> ({order.route_name})
+                            Destination: <strong className="text-slate-800">{order.destination_city} Hub</strong> ({order.route_name})
                           </div>
                           <div>
-                            Delivery Deadline: <strong className="text-slate-200">{order.delivery_date}</strong>
+                            Delivery Cutoff: <strong className="text-slate-800">{order.delivery_date}</strong>
                           </div>
                           <div>
-                            Total Cargo: <strong className="text-emerald-400">{order.total_required_space.toFixed(2)} space units</strong> ({order.total_quantity} items)
+                            Required Wagon Space: <strong className="text-green-700 font-bold">{order.total_required_space.toFixed(2)} units</strong> ({order.total_quantity} items)
                           </div>
                         </div>
 
@@ -817,7 +967,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                           {order.items.map((i) => (
                             <span
                               key={i.order_item_id}
-                              className="text-[11px] bg-slate-900 border border-white/10 px-2 py-0.5 rounded-lg text-slate-300"
+                              className="text-[11px] bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700 font-medium"
                             >
                               {i.product_name} &times; <strong>{i.quantity}</strong> ({Number(i.required_space).toFixed(2)} space)
                             </span>
@@ -825,10 +975,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2.5 shrink-0">
                         <button
                           onClick={() => handleInspectSuitableTrips(order.order_id)}
-                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all cursor-pointer"
+                          className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
                         >
                           Check Suitable Trips
                         </button>
@@ -836,9 +986,9 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                         <button
                           onClick={() => handleAllocate(order.order_id)}
                           disabled={loading}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-bold shadow-md shadow-green-900/30 transition-all cursor-pointer"
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-md shadow-green-600/20 transition-all cursor-pointer"
                         >
-                          <Split className="h-3.5 w-3.5" />
+                          <Split className="h-4 w-4" />
                           <span>Allocate Rail Capacity</span>
                         </button>
                       </div>
@@ -855,28 +1005,28 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* ======================================================== */}
         {activeTab === "breakdown" && (
           <div className="space-y-4">
-            <div className="bg-slate-900/70 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+            <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Order Allocation Breakdown (LM-19)</h2>
-                  <p className="text-xs text-slate-400">
+                  <h2 className="text-xl font-bold text-slate-900">Order Allocation Breakdown (LM-19)</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Trip-by-trip wagon distribution, multi-trip spillover visualisation, and capacity reversal (LM-18)
                   </p>
                 </div>
               </div>
 
               {/* Order Search Bar */}
-              <div className="mt-4 flex items-center gap-3 max-w-md">
+              <div className="mt-5 flex items-center gap-3 max-w-md">
                 <input
                   type="number"
-                  placeholder="Enter Customer Order ID..."
+                  placeholder="Enter Customer Order ID (e.g. 1141)..."
                   value={breakdownOrderId}
                   onChange={(e) => setBreakdownOrderId(e.target.value ? Number(e.target.value) : "")}
-                  className="flex-1 bg-slate-950 border border-white/15 rounded-xl px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-green-500"
+                  className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-green-500 shadow-sm"
                 />
                 <button
                   onClick={() => breakdownOrderId && handleLoadOrderAllocations(Number(breakdownOrderId))}
-                  className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold text-xs transition-all cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
                 >
                   Lookup Breakdown
                 </button>
@@ -885,24 +1035,24 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
               {/* Breakdown display */}
               {orderAllocations && (
                 <div className="mt-6 space-y-4">
-                  <div className="bg-slate-950/80 border border-white/10 rounded-2xl p-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-base">Order #{orderAllocations.orderId}</span>
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-bold text-slate-900 text-lg">Order #{orderAllocations.orderId}</span>
                           {orderAllocations.allocations.length > 1 ? (
-                            <span className="text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                              <Split className="h-3 w-3" /> Multi-Trip Spillover ({orderAllocations.allocations.length} Trips)
+                            <span className="text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full flex items-center gap-1.5">
+                              <Split className="h-3.5 w-3.5" /> Multi-Trip Spillover ({orderAllocations.allocations.length} Trains)
                             </span>
                           ) : (
-                            <span className="text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+                            <span className="text-[11px] font-bold bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full">
                               Single Trip Booking
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">
-                          Total Allocated Space:{" "}
-                          <strong className="text-white">
+                        <p className="text-xs text-slate-500 mt-1.5">
+                          Total Allocated Carriage Space:{" "}
+                          <strong className="text-slate-900 font-bold">
                             {orderAllocations.allocations.reduce((acc, curr) => acc + Number(curr.allocated_space), 0).toFixed(2)} units
                           </strong>
                         </p>
@@ -911,9 +1061,9 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                       <button
                         onClick={() => handleReverseAllocation(orderAllocations.orderId)}
                         disabled={loading}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-500/30 text-red-200 text-xs font-bold transition-all cursor-pointer"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold transition-all cursor-pointer"
                       >
-                        <Undo2 className="h-3.5 w-3.5 text-red-400" />
+                        <Undo2 className="h-4 w-4 text-red-600" />
                         <span>Reverse Allocation (LM-18)</span>
                       </button>
                     </div>
@@ -922,7 +1072,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                     <div className="mt-4 overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="border-b border-white/10 text-slate-400 uppercase text-[10px]">
+                          <tr className="border-b border-slate-200/80 text-slate-500 uppercase text-[10px] font-semibold">
                             <th className="py-2.5 px-3">Allocation ID</th>
                             <th className="py-2.5 px-3">Assigned Trip</th>
                             <th className="py-2.5 px-3">Departure Date & Time</th>
@@ -930,21 +1080,21 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                             <th className="py-2.5 px-3">Occupied Wagon Space</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-slate-100">
                           {orderAllocations.allocations.map((a, idx) => (
-                            <tr key={a.allocation_id} className="hover:bg-white/[0.02]">
-                              <td className="py-2.5 px-3 font-mono text-slate-400">#{a.allocation_id}</td>
-                              <td className="py-2.5 px-3 font-semibold text-white">
+                            <tr key={a.allocation_id} className="hover:bg-slate-50/60">
+                              <td className="py-3 px-3 font-mono text-slate-500 font-semibold">#{a.allocation_id}</td>
+                              <td className="py-3 px-3 font-semibold text-slate-900">
                                 Train Trip #{a.trip_id}
                                 {orderAllocations.allocations.length > 1 && (
-                                  <span className="text-[10px] text-amber-400 ml-2 font-normal">
-                                    (Spillover Leg {idx + 1})
+                                  <span className="text-[11px] text-amber-700 ml-2 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                    Spillover Leg {idx + 1}
                                   </span>
                                 )}
                               </td>
-                              <td className="py-2.5 px-3 text-slate-300">{a.departure_datetime}</td>
-                              <td className="py-2.5 px-3 font-bold text-slate-100">{a.allocated_quantity} units</td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
+                              <td className="py-3 px-3 text-slate-600">{a.departure_datetime}</td>
+                              <td className="py-3 px-3 font-bold text-slate-800">{a.allocated_quantity} units</td>
+                              <td className="py-3 px-3 font-mono font-bold text-green-700">
                                 {Number(a.allocated_space).toFixed(2)} space
                               </td>
                             </tr>
@@ -964,22 +1114,22 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* ======================================================== */}
         {activeTab === "schedules" && (
           <div className="space-y-4">
-            <div className="bg-slate-900/70 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+            <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Public Train Timetable & Caching Analytics</h2>
-                  <p className="text-xs text-slate-400">
-                    Cached endpoint <code className="text-green-400 font-mono">/api/v1/rail/schedules</code> (TTL 60s, invalidated upon allocations)
+                  <h2 className="text-xl font-bold text-slate-900">Public Train Timetable & Caching Analytics</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Cached endpoint <code className="text-green-700 font-mono font-semibold">/api/v1/rail/schedules</code> (TTL 60s, invalidated automatically on allocations)
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-xs bg-slate-950 border border-white/10 px-3 py-1.5 rounded-xl">
-                    <span className="text-slate-400">X-Cache Status:</span>
+                  <div className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                    <span className="text-slate-500">X-Cache Status:</span>
                     <span
                       className={`font-mono font-bold px-2 py-0.5 rounded-md ${
                         cacheStatus === "HIT"
-                          ? "bg-emerald-950 text-emerald-400 border border-emerald-500/30"
-                          : "bg-amber-950 text-amber-400 border border-amber-500/30"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-amber-100 text-amber-800"
                       }`}
                     >
                       {cacheStatus}
@@ -987,29 +1137,29 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                   </div>
                   <button
                     onClick={loadSchedules}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-all cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-all cursor-pointer"
                   >
                     Test Cache Fetch
                   </button>
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {schedules.map((s) => (
-                  <div key={s.trip_id} className="bg-slate-950/70 border border-white/10 rounded-2xl p-4 space-y-2">
+                  <div key={s.trip_id} className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-2 shadow-sm">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-white text-xs">Trip #{s.trip_id}</span>
-                      <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-semibold">
+                      <span className="font-mono font-bold text-slate-900 text-xs">Trip #{s.trip_id}</span>
+                      <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-semibold">
                         {s.status}
                       </span>
                     </div>
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-sm font-semibold text-slate-900">
                       {s.origin_city} &rarr; {s.destination_city}
                     </div>
-                    <div className="text-xs text-slate-400 space-y-0.5">
-                      <div>Departs: <strong className="text-slate-200">{s.departure_datetime}</strong></div>
-                      <div>Arrives: <strong className="text-slate-200">{s.arrival_datetime}</strong></div>
-                      <div>Remaining Capacity: <strong className="text-emerald-400">{Number(s.remaining_capacity).toFixed(1)} units</strong></div>
+                    <div className="text-xs text-slate-500 space-y-1 pt-1">
+                      <div>Departs: <strong className="text-slate-800">{s.departure_datetime}</strong></div>
+                      <div>Arrives: <strong className="text-slate-800">{s.arrival_datetime}</strong></div>
+                      <div>Remaining Capacity: <strong className="text-green-700 font-semibold">{Number(s.remaining_space).toFixed(1)} space units</strong></div>
                     </div>
                   </div>
                 ))}
@@ -1023,20 +1173,20 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* ======================================================== */}
         {activeTab === "audit" && (
           <div className="space-y-4">
-            <div className="bg-slate-900/70 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+            <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Immutable Rail Audit Trail (LM-23)</h2>
-                  <p className="text-xs text-slate-400">
-                    Tamper-proof event logs recording all train creation, allocation, reversal, and cancellation events
+                  <h2 className="text-xl font-bold text-slate-900">Immutable Rail Audit Trail (LM-23)</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Tamper-proof logs recording all train creation, allocation, reversal, and cancellation events
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-5 overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 text-slate-400 uppercase text-[10px]">
+                    <tr className="border-b border-slate-200/80 text-slate-500 uppercase text-[10px] font-semibold">
                       <th className="py-2.5 px-3">Log ID</th>
                       <th className="py-2.5 px-3">Timestamp</th>
                       <th className="py-2.5 px-3">Actor</th>
@@ -1045,25 +1195,25 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                       <th className="py-2.5 px-3">Outcome</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-slate-100">
                     {auditLogs.map((log) => (
-                      <tr key={log.audit_id} className="hover:bg-white/[0.02]">
-                        <td className="py-2.5 px-3 font-mono text-slate-400">#{log.audit_id}</td>
-                        <td className="py-2.5 px-3 text-slate-300">{log.occurred_at}</td>
-                        <td className="py-2.5 px-3">
-                          <span className="font-semibold text-white">{log.user_name || "System"}</span>
+                      <tr key={log.audit_id} className="hover:bg-slate-50/60">
+                        <td className="py-3 px-3 font-mono text-slate-500">#{log.audit_id}</td>
+                        <td className="py-3 px-3 text-slate-600">{log.occurred_at}</td>
+                        <td className="py-3 px-3">
+                          <span className="font-semibold text-slate-900">{log.user_name || "System"}</span>
                           <span className="text-[10px] text-slate-500 ml-1.5">({log.user_role})</span>
                         </td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{log.action}</td>
-                        <td className="py-2.5 px-3 text-slate-300">
+                        <td className="py-3 px-3 font-mono font-bold text-slate-800">{log.action}</td>
+                        <td className="py-3 px-3 text-slate-600">
                           {log.entity_name} #{log.entity_id}
                         </td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-3 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                               log.outcome === "SUCCESS"
-                                ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30"
-                                : "bg-red-950 text-red-300 border border-red-500/30"
+                                ? "bg-green-50 text-green-700 border border-green-200"
+                                : "bg-red-50 text-red-700 border border-red-200"
                             }`}
                           >
                             {log.outcome}
@@ -1082,15 +1232,15 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* MODAL: CREATE TRAIN TRIP (LM-01) */}
         {/* ======================================================== */}
         {createModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-            <div className="bg-slate-900 border border-white/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Train className="h-4 w-4 text-green-400" /> Create Scheduled Train Trip
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Train className="h-5 w-5 text-green-600" /> Create Scheduled Train Trip
                 </h3>
                 <button
                   onClick={() => setCreateModalOpen(false)}
-                  className="text-slate-400 hover:text-white cursor-pointer"
+                  className="text-slate-400 hover:text-slate-700 cursor-pointer text-lg"
                 >
                   &times;
                 </button>
@@ -1098,82 +1248,86 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
               <form onSubmit={handleCreateTrip} className="space-y-4 text-xs">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Origin Station (Mandatory Hub)</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Origin Station (LM-03)</label>
                   <input
                     type="text"
                     disabled
-                    value="Kandy Central Goods Yard (Station #7)"
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-slate-400 cursor-not-allowed"
+                    value="Kandy Central Goods Yard (Station #7) - Mainline Origin Enforced"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-500 font-medium cursor-not-allowed"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1">Per LM-03 policy, all trips depart from Kandy.</p>
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Destination Station Hub</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Destination Hub Station</label>
                   <select
                     value={newTripDestination}
                     onChange={(e) => setNewTripDestination(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-white/20 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-green-500"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                   >
-                    <option value={1}>Colombo Main Railway Station Store (ID #1)</option>
-                    <option value={2}>Negombo Station Hub (ID #2)</option>
-                    <option value={3}>Galle Station Hub (ID #3)</option>
-                    <option value={4}>Matara Station Hub (ID #4)</option>
-                    <option value={5}>Jaffna Station Hub (ID #5)</option>
-                    <option value={6}>Trincomalee Station Hub (ID #6)</option>
+                    <option value={1}>Station #1: Colombo Fort Goods Shed</option>
+                    <option value={4}>Station #4: Galle Railway Station Goods Yard</option>
+                    <option value={9}>Station #9: Jaffna Central Station Goods Yard</option>
+                    <option value={12}>Station #12: Matara Terminal Shed</option>
+                    <option value={18}>Station #18: Badulla Hillside Rail Terminal</option>
+                    <option value={20}>Station #20: Anuradhapura Main Station</option>
                   </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Departure Datetime</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Departure Date & Time</label>
                     <input
                       type="datetime-local"
                       required
                       value={newTripDeparture}
                       onChange={(e) => setNewTripDeparture(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/20 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-green-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Arrival Datetime</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Arrival Date & Time</label>
                     <input
                       type="datetime-local"
                       required
                       value={newTripArrival}
                       onChange={(e) => setNewTripArrival(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/20 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-green-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Total Carriage Capacity (Space Units)</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Total Carriage Capacity (Space Units)</label>
                   <input
                     type="number"
                     min="1"
+                    max="500"
                     step="0.5"
                     required
                     value={newTripCapacity}
                     onChange={(e) => setNewTripCapacity(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-white/20 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-green-500"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                   />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Defines total wagon slots available for freight allocation.
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setCreateModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer font-semibold"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold shadow-md shadow-green-600/25"
                   >
-                    {loading ? "Creating..." : "Confirm Trip Creation"}
+                    Create Train Trip
                   </button>
                 </div>
               </form>
@@ -1182,76 +1336,77 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         )}
 
         {/* ======================================================== */}
-        {/* MODAL: EDIT TRIP (LM-02) */}
+        {/* MODAL: EDIT TRIP CAPACITY (LM-02) */}
         {/* ======================================================== */}
         {editTrip && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-            <div className="bg-slate-900 border border-white/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <h3 className="text-base font-bold text-white">
-                  Update Trip #{editTrip.trip_id} ({editTrip.origin_city} &rarr; {editTrip.destination_city})
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-green-600" /> Edit Capacity: Trip #{editTrip.trip_id}
                 </h3>
-                <button onClick={() => setEditTrip(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                <button
+                  onClick={() => setEditTrip(null)}
+                  className="text-slate-400 hover:text-slate-700 cursor-pointer text-lg"
+                >
                   &times;
                 </button>
               </div>
 
               <form onSubmit={handleUpdateTrip} className="space-y-4 text-xs">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Total Capacity (Current Used: {Number(editTrip.used_space).toFixed(1)})
-                  </label>
+                  <label className="block text-slate-700 font-semibold mb-1">New Total Capacity (Space Units)</label>
                   <input
                     type="number"
                     min={Number(editTrip.used_space)}
+                    max="500"
                     step="0.5"
                     required
                     value={editCapacity}
                     onChange={(e) => setEditCapacity(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-white/20 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-green-500"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    DB trigger prevents reducing capacity below {Number(editTrip.used_space).toFixed(1)} units.
-                  </p>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Capacity cannot be reduced below currently allocated space ({Number(editTrip.used_space).toFixed(1)} units).
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Departure Datetime</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Departure</label>
                     <input
                       type="datetime-local"
-                      required
                       value={editDeparture}
                       onChange={(e) => setEditDeparture(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/20 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-green-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Arrival Datetime</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Arrival</label>
                     <input
                       type="datetime-local"
-                      required
                       value={editArrival}
                       onChange={(e) => setEditArrival(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/20 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-green-500"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setEditTrip(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer font-semibold"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold shadow-md shadow-green-600/25"
                   >
-                    {loading ? "Updating..." : "Save Changes"}
+                    Update Trip
                   </button>
                 </div>
               </form>
@@ -1260,61 +1415,89 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         )}
 
         {/* ======================================================== */}
-        {/* MODAL: SUITABLE TRIPS DISCOVERY (LM-03/04/15) */}
+        {/* DRAWER: SUITABLE TRIPS MODAL (LM-03, LM-04, LM-15) */}
         {/* ======================================================== */}
-        {suitableTripsModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-            <div className="bg-slate-900 border border-white/20 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <h3 className="text-base font-bold text-white">
-                  Eligible Chronological Trips for Order #{suitableTripsModal.orderId}
-                </h3>
+        {suitableDrawerOpen && selectedOrderForSuitable && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Train className="h-5 w-5 text-green-600" /> Suitable Trips for Order #{selectedOrderForSuitable.order_id}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Destination: <strong className="text-slate-800">{selectedOrderForSuitable.destination_city} Hub</strong> • Deadline: <strong className="text-slate-800">{selectedOrderForSuitable.delivery_date}</strong> • Required: <strong className="text-green-700">{selectedOrderForSuitable.total_required_space.toFixed(2)} space units</strong>
+                  </p>
+                </div>
                 <button
-                  onClick={() => setSuitableTripsModal(null)}
-                  className="text-slate-400 hover:text-white cursor-pointer font-bold"
+                  onClick={() => setSuitableDrawerOpen(false)}
+                  className="text-slate-400 hover:text-slate-700 cursor-pointer text-lg"
                 >
                   &times;
                 </button>
               </div>
 
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                {suitableTripsModal.trips.length === 0 ? (
-                  <div className="py-8 text-center text-slate-400 text-xs">
-                    No eligible scheduled trips found departing Kandy before the order delivery deadline.
+              <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+                {suitableTripsList.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500">
+                    <AlertCircle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-800">No suitable train trips available</p>
+                    <p className="text-xs mt-1">There are no scheduled trips departing Kandy towards this destination before the delivery cutoff date.</p>
                   </div>
                 ) : (
-                  suitableTripsModal.trips.map((st) => (
+                  suitableTripsList.map((st) => (
                     <div
                       key={st.trip_id}
-                      className="bg-slate-950 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4 text-xs"
+                      className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div>
-                        <div className="font-semibold text-white">
-                          Trip #{st.trip_id} &bull; {st.origin_city} &rarr; {st.destination_city}
+                        <div className="flex items-center gap-2 font-mono font-bold text-slate-900 text-sm">
+                          <span>Trip #{st.trip_id}</span>
+                          <span className="text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-sans">
+                            Kandy Mainline
+                          </span>
                         </div>
-                        <div className="text-slate-400 mt-1">
-                          Departs: <strong className="text-slate-200">{st.departure_datetime}</strong> &bull; Arrives:{" "}
-                          <strong className="text-slate-200">{st.arrival_datetime}</strong>
+                        <div className="text-xs text-slate-600 space-y-0.5 mt-1.5">
+                          <div>Departure: <strong className="text-slate-800">{st.departure_datetime}</strong></div>
+                          <div>Arrival: <strong className="text-slate-800">{st.arrival_datetime}</strong></div>
+                          <div>
+                            Available Carriage Space: <strong className="text-green-700 font-bold">{Number(st.remaining_space).toFixed(1)} units</strong> ({Number(st.total_capacity).toFixed(1)} total)
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-mono font-bold text-emerald-400">
-                          {Number(st.remaining_space).toFixed(1)} space units avail
-                        </div>
-                        <div className="text-[10px] text-slate-500">Total: {Number(st.total_capacity).toFixed(1)}</div>
+
+                      <div className="text-right sm:self-center">
+                        <span className="text-xs font-mono font-semibold text-slate-600 block">
+                          {st.utilisation_pct.toFixed(0)}% full
+                        </span>
                       </div>
                     </div>
                   ))
                 )}
               </div>
 
-              <div className="pt-3 border-t border-white/10 flex justify-end">
-                <button
-                  onClick={() => setSuitableTripsModal(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-white font-semibold text-xs cursor-pointer"
-                >
-                  Close
-                </button>
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  {suitableTripsList.length} suitable train trips discovered
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSuitableDrawerOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSuitableDrawerOpen(false);
+                      handleAllocate(selectedOrderForSuitable.order_id);
+                    }}
+                    disabled={suitableTripsList.length === 0 || loading}
+                    className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-md shadow-green-600/20"
+                  >
+                    Allocate Now
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1323,49 +1506,49 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         {/* ======================================================== */}
         {/* MODAL: TRIP CONSIGNMENTS MANIFEST (LM-20) */}
         {/* ======================================================== */}
-        {selectedTripConsignments && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
-            <div className="bg-slate-900 border border-white/20 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <h3 className="text-base font-bold text-white">
-                  Cargo Bookings for Train Trip #{selectedTripConsignments.tripId} (LM-20)
+        {tripConsignmentsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-green-600" /> Cargo Manifest: Train Trip #{tripConsignmentsModal.tripId}
                 </h3>
                 <button
-                  onClick={() => setSelectedTripConsignments(null)}
-                  className="text-slate-400 hover:text-white cursor-pointer font-bold"
+                  onClick={() => setTripConsignmentsModal(null)}
+                  className="text-slate-400 hover:text-slate-700 cursor-pointer text-lg"
                 >
                   &times;
                 </button>
               </div>
 
-              <div className="max-h-[60vh] overflow-y-auto">
-                {selectedTripConsignments.items.length === 0 ? (
-                  <div className="py-8 text-center text-slate-400 text-xs">
-                    No order consignments have been booked onto this train trip yet.
+              <div className="overflow-y-auto flex-1">
+                {tripConsignmentsModal.items.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500">
+                    <Boxes className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-800">No freight cargo booked yet</p>
+                    <p className="text-xs mt-1">This train currently has zero consignments allocated.</p>
                   </div>
                 ) : (
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-white/10 text-slate-400 uppercase text-[10px]">
+                      <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px] font-semibold">
                         <th className="py-2.5 px-3">Order ID</th>
                         <th className="py-2.5 px-3">Customer</th>
                         <th className="py-2.5 px-3">Product</th>
                         <th className="py-2.5 px-3">Quantity</th>
-                        <th className="py-2.5 px-3">Space Occupied</th>
-                        <th className="py-2.5 px-3">Booked At</th>
+                        <th className="py-2.5 px-3">Wagon Space</th>
+                        <th className="py-2.5 px-3">Scheduled By</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {selectedTripConsignments.items.map((item) => (
-                        <tr key={item.allocation_id} className="hover:bg-white/[0.02]">
-                          <td className="py-2.5 px-3 font-mono font-bold text-white">#{item.order_id}</td>
-                          <td className="py-2.5 px-3 text-slate-200">{item.customer_name}</td>
-                          <td className="py-2.5 px-3 text-slate-300">{item.product_name}</td>
-                          <td className="py-2.5 px-3 font-semibold text-white">{item.allocated_quantity}</td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-400">
-                            {Number(item.allocated_space).toFixed(2)}
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-400 text-[11px]">{item.allocated_at}</td>
+                    <tbody className="divide-y divide-slate-100">
+                      {tripConsignmentsModal.items.map((ci) => (
+                        <tr key={ci.allocation_id} className="hover:bg-slate-50/60">
+                          <td className="py-2.5 px-3 font-mono font-bold text-slate-900">#{ci.order_id}</td>
+                          <td className="py-2.5 px-3 text-slate-800 font-medium">{ci.customer_name}</td>
+                          <td className="py-2.5 px-3 text-slate-600">{ci.product_name}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{ci.allocated_quantity}</td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-green-700">{Number(ci.allocated_space).toFixed(2)}</td>
+                          <td className="py-2.5 px-3 text-slate-500">{ci.allocated_by_name}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1373,10 +1556,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                 )}
               </div>
 
-              <div className="pt-3 border-t border-white/10 flex justify-end">
+              <div className="pt-3 border-t border-slate-100 text-right">
                 <button
-                  onClick={() => setSelectedTripConsignments(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-white font-semibold text-xs cursor-pointer"
+                  onClick={() => setTripConsignmentsModal(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
                 >
                   Close
                 </button>
