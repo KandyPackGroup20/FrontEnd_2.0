@@ -69,7 +69,7 @@ export function middleware(request: NextRequest) {
   const isProtectedRoute = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
 
   // 4. Auth routes where already-logged-in users should be redirected
-  const isAuthRoute = pathname === '/' || pathname === '/login' || pathname === '/register';
+  const isAuthRoute = pathname === '/login' || pathname === '/register';
 
   // Case A: Unauthenticated user trying to access protected customer routes
   if (isProtectedRoute && !isAuthenticated) {
@@ -78,9 +78,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Case B: Authenticated user trying to access / or /login or /register
+  // Case B: Authenticated user trying to access /login or /register
   if (isAuthRoute && isAuthenticated) {
-    return NextResponse.redirect(new URL(session?.role === 'CUSTOMER' ? '/orders' : '/admin/roster', request.url));
+    let dest = '/orders';
+    if (session?.role === 'LOGISTICS_MGR') dest = '/admin/rail';
+    else if (session?.role === 'DISPATCHER') dest = '/admin/roster';
+    else if (session?.role === 'WAREHOUSE_STAFF' || session?.role === 'STORE_MGR') dest = '/warehouse';
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   // Case C: Enforce forced password reset on initial login
@@ -106,7 +110,6 @@ export const config = {
     '/orders/:path*',
     '/order/:path*',
     '/profile/:path*',
-    '/',
     '/login',
     '/register',
     '/admin/:path*'
