@@ -4,7 +4,8 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, ArrowRight, Train, Sparkles, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, ArrowRight, Train, Loader2, AlertCircle } from "lucide-react";
+import { setAuthToken } from "@/lib/api";
 
 function LoginForm() {
   const router = useRouter();
@@ -16,12 +17,6 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-
-  function fillDemoCredentials() {
-    setEmail("customer1@gmail.com");
-    setPassword("password123");
-    setError("");
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,15 +30,19 @@ function LoginForm() {
     setLoading(true);
 
     try {
+      const cleanEmail = email.trim();
+      const portalType = cleanEmail.endsWith("@kandypack.lk") ? "admin" : "customer";
+
       const res = await fetch("/api/v1/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email,
-          password,
-          portal_type: "customer",
+          email: cleanEmail,
+          password: password,
+          portal_type: portalType,
         }),
       });
 
@@ -51,23 +50,33 @@ function LoginForm() {
       try {
         data = await res.json();
       } catch {
-        // In case proxy returns plain text 500/502
+        // Response was not JSON
       }
 
       if (!res.ok) {
-        throw new Error((data?.detail as string) || "Login failed. Please verify that your backend server is running.");
+        throw new Error(
+          (data?.detail as string) || "Login failed. Please verify your credentials."
+        );
+      }
+
+      if (data?.access_token && typeof data.access_token === "string") {
+        setAuthToken(data.access_token);
       }
 
       setSuccess(true);
       setTimeout(() => {
-        if (data?.role === "SUPERADMIN" || data?.force_password_reset) {
+        const role = data?.role as string | undefined;
+        if (role === "STORE_MGR" || role === "WAREHOUSE_STAFF") {
+          router.push("/warehouse");
+        } else if (role === "SUPERADMIN" || data?.force_password_reset) {
           router.push("/profile");
         } else {
           router.push(redirectTarget);
         }
-      }, 800);
+      }, 700);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred.";
       setError(message);
     } finally {
       setLoading(false);
@@ -107,25 +116,8 @@ function LoginForm() {
           Welcome back
         </h1>
         <p className="mb-6 text-center text-sm text-green-100/80">
-          Sign in to manage your shipments
+          Sign in to access your portal
         </p>
-
-        {/* Demo Credentials Helper Card */}
-        <div className="mb-6 rounded-2xl bg-white/10 border border-white/15 p-3.5 flex items-center justify-between text-xs backdrop-blur-md">
-          <div>
-            <div className="font-semibold text-green-300 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-green-300" /> Demo Account
-            </div>
-            <div className="text-white/70 mt-0.5">customer1@gmail.com • password123</div>
-          </div>
-          <button
-            type="button"
-            onClick={fillDemoCredentials}
-            className="rounded-lg bg-green-500/25 hover:bg-green-500/40 text-green-200 border border-green-400/30 px-3 py-1.5 text-[11px] font-semibold transition-all cursor-pointer"
-          >
-            Auto Fill
-          </button>
-        </div>
 
         {success ? (
           <motion.div
