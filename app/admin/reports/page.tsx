@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type ReportRow = Record<string, any>;
 
@@ -101,6 +102,10 @@ async function loadReport(url: string) {
 }
 
 export default function ReportsPage() {
+  const router = useRouter();
+
+  const [authorized, setAuthorized] = useState(false);
+
   const [quarterlySales, setQuarterlySales] = useState<ReportRow[]>([]);
   const [topProducts, setTopProducts] = useState<ReportRow[]>([]);
   const [railCapacity, setRailCapacity] = useState<ReportRow[]>([]);
@@ -112,11 +117,34 @@ export default function ReportsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function loadAllReports() {
+    async function checkAccessAndLoadReports() {
       try {
         setLoading(true);
         setError("");
 
+        // Check currently logged-in user
+        const authResponse = await fetch("/api/v1/auth/me", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        // Not logged in
+        if (!authResponse.ok) {
+          router.replace("/login?redirect=/admin/reports");
+          return;
+        }
+
+        const user = await authResponse.json();
+
+        // Only SUPERADMIN can view management reports
+        if (user.role !== "SUPERADMIN") {
+          router.replace("/profile");
+          return;
+        }
+
+        setAuthorized(true);
+
+        // Load reports only after access is confirmed
         const [
           quarterlySalesData,
           topProductsData,
@@ -143,15 +171,33 @@ export default function ReportsPage() {
         console.error(err);
 
         setError(
-          "Unable to load one or more reports. Please make sure the backend is running."
+          "Unable to load the management reports. Please make sure the backend is running."
         );
       } finally {
         setLoading(false);
       }
     }
 
-    loadAllReports();
-  }, []);
+    checkAccessAndLoadReports();
+  }, [router]);
+
+  if (!authorized && loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-emerald-50/40">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-500" />
+
+          <p className="text-sm font-medium text-slate-600">
+            Checking access...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!authorized) {
+    return null;
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.09),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.06),_transparent_30%),linear-gradient(to_bottom,_#fbfffc,_#f6fbf8,_#ffffff)] px-4 pb-20 pt-28 md:px-8">
@@ -174,16 +220,6 @@ export default function ReportsPage() {
             database.
           </p>
         </div>
-
-        {loading && (
-          <div className="rounded-[28px] border border-emerald-100/60 bg-white/75 p-10 text-center shadow-[0_8px_24px_rgba(16,185,129,0.05)] backdrop-blur-xl">
-            <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-500" />
-
-            <p className="font-medium text-slate-600">
-              Loading management reports...
-            </p>
-          </div>
-        )}
 
         {error && (
           <div className="mb-8 rounded-2xl border border-red-200/70 bg-white/80 p-4 text-red-600 shadow-sm backdrop-blur-lg">

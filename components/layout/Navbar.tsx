@@ -57,7 +57,6 @@ export default function Navbar() {
     { label: "How it Works", href: "#how-it-works" },
     { label: "Coverage", href: "#coverage" },
     { label: "Track Order", href: "/orders" },
-    { label: "Reports", href: "/admin/reports" },
   ];
 
   return (
