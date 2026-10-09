@@ -41,9 +41,9 @@ export function middleware(request: NextRequest) {
   const isAdminRoute = pathname.startsWith('/admin');
   if (isAdminRoute) {
     if (!isAuthenticated) {
-      const Url = new URL('/', request.url);
-      Url.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(Url);
+      const loginUrl = new URL('/', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
     }
     // REQ-2: If token role is CUSTOMER, block immediately with HTTP 403 Forbidden
     if (session?.role === 'CUSTOMER') {
@@ -55,28 +55,35 @@ export function middleware(request: NextRequest) {
         { status: 403, headers: { 'content-type': 'application/json' } }
       );
     }
+    // 4.2: rail capacity management is restricted to LOGISTICS_MGR and SUPERADMIN
+    if (pathname.startsWith('/admin/rail') && !['LOGISTICS_MGR', 'SUPERADMIN'].includes(session?.role ?? '')) {
+      return new NextResponse(
+        JSON.stringify({ error: 'FORBIDDEN_ROLE', message: 'Only Logistics Managers and Superadmins can access rail capacity management.' }),
+        { status: 403, headers: { 'content-type': 'application/json' } }
+      );
+    }
   }
 
   // 2. Protected customer routes that require an authenticated session
   const protectedPrefixes = ['/orders', '/order', '/profile'];
   const isProtectedRoute = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
 
-  // 3. Auth routes where already-logged-in users should be redirected
-  const isAuthRoute = pathname === '/' || pathname === '/register';
+  // 4. Auth routes where already-logged-in users should be redirected
+  const isAuthRoute = pathname === '/' || pathname === '/login' || pathname === '/register';
 
   // Case A: Unauthenticated user trying to access protected customer routes
   if (isProtectedRoute && !isAuthenticated) {
-    const Url = new URL('/', request.url);
-    Url.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(Url);
+    const loginUrl = new URL('/', request.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // Case B: Authenticated user trying to access / or /register
+  // Case B: Authenticated user trying to access / or /login or /register
   if (isAuthRoute && isAuthenticated) {
     return NextResponse.redirect(new URL(session?.role === 'CUSTOMER' ? '/orders' : '/admin/roster', request.url));
   }
 
-  // Case C: Enforce forced password reset on initial 
+  // Case C: Enforce forced password reset on initial login
   if (isAuthenticated && session?.force_password_reset && pathname !== '/profile') {
     const profileUrl = new URL('/profile', request.url);
     profileUrl.searchParams.set('force_reset', 'true');
@@ -100,6 +107,7 @@ export const config = {
     '/order/:path*',
     '/profile/:path*',
     '/',
+    '/login',
     '/register',
     '/admin/:path*'
   ],
