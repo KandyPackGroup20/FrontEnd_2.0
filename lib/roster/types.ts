@@ -39,6 +39,76 @@ export interface RosterTruck {
   station_id: string | null;
   plate_number: string;
   is_active: boolean;
+  capacity?: string | null;
+  capacity_unit?: "KG" | null;
+}
+
+export interface StationStore {
+  station_id: number;
+  station_name: string;
+  address: string;
+}
+
+export interface CargoItem {
+  order_id: number;
+  order_item_id: number;
+  product_id: number;
+  product_name: string;
+  ordered_quantity: number;
+  allocated_quantity: number;
+  received_quantity: number;
+  wrong_destination: number;
+  unit_weight_kg: string | null;
+}
+
+export interface CargoOrder {
+  order_id: number;
+  delivery_date: string;
+  order_status: string;
+  route_id: number;
+  route_name: string;
+  station_id: number;
+  station_name: string;
+  customer_name: string;
+  recipient_name: string;
+  recipient_phone: string;
+  delivery_address: string;
+  assigned_roster_id: number | null;
+  delivery_id: number | null;
+  assigned_weight_kg: string | null;
+  weight_kg: string;
+  eligible: boolean;
+  blocked_reasons: string[];
+  items: CargoItem[];
+}
+
+export interface TruckSchedule {
+  roster_id: number;
+  route_id: number;
+  station_id: number;
+  station_name: string;
+  route_name: string;
+  truck_id: number;
+  plate_number: string;
+  capacity: string;
+  capacity_unit: "KG" | null;
+  is_active: boolean;
+  driver_id: number;
+  driver_name: string;
+  assistant_id: number;
+  assistant_name: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  order_count: number;
+  unit_count: number;
+  cargo_weight_kg: string;
+}
+
+export interface LoadingListData {
+  schedule: TruckSchedule;
+  orders: CargoOrder[];
+  timezone: "Asia/Colombo";
 }
 
 export interface RosterStaff {
@@ -103,6 +173,7 @@ export interface RosterAssignmentCreated {
 
 export interface RosterStaffHours {
   staff_id: number;
+  staff_name?: string | null;
   staff_type: "DRIVER" | "ASSISTANT";
   scheduled_seconds: number;
   limit_seconds: number;
@@ -120,6 +191,12 @@ export interface RosterAuditAttempt {
   audit_id: number;
   actor_id: number;
   actor_name: string | null;
+  route_name?: string | null;
+  station_id?: number | null;
+  station_name?: string | null;
+  plate_number?: string | null;
+  driver_name?: string | null;
+  assistant_name?: string | null;
   attempted_route_id: number;
   attempted_truck_id: number;
   attempted_driver_id: number;

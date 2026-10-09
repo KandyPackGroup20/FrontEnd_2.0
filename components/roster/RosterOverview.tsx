@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Info, Loader2, RefreshCw, Truck, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Loader2, RefreshCw, Truck, Users } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
-import AssignmentForm from "@/components/roster/AssignmentForm";
+import DeliveryDemand from "@/components/roster/DeliveryDemand";
 import AttemptHistory from "@/components/roster/AttemptHistory";
 import WeeklyHours from "@/components/roster/WeeklyHours";
 import type { ReportState } from "@/components/roster/WeeklyHours";
@@ -74,6 +74,7 @@ export default function RosterOverview() {
   const router = useRouter();
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const [displayWeek, setDisplayWeek] = useState(currentColomboWeek);
   const [selection, setSelection] = useState<{ weekStart: string; dataSource: RosterMetadata["data_source"] } | null>(null);
   const auditCache = useRef<ReportState<RosterAudit> | null>(null);
 
@@ -99,6 +100,7 @@ export default function RosterOverview() {
         const weekStart = selection?.dataSource === catalog.meta.data_source
           ? selection.weekStart : initialRosterWeek(catalog.meta);
         const range = rosterWeekRange(weekStart);
+        setDisplayWeek(weekStart);
         const auditRequest = auditCache.current === null
           ? reportState(getRosterAudit(signal, 50))
           : Promise.resolve(auditCache.current);
@@ -169,7 +171,6 @@ export default function RosterOverview() {
           <div className="max-w-3xl">
             <p className="mb-3 text-sm font-semibold text-green-700">Delivery operations</p>
             <h1 className="text-[clamp(2.25rem,5vw,3.75rem)]">Truck roster</h1>
-            <p className="mt-4 text-lg">Review delivery schedules, trucks, and the people assigned to each route.</p>
           </div>
           {state.kind === "ready" && (
             <Button variant="secondary" onClick={refresh} className="min-h-11 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-600">
@@ -177,6 +178,19 @@ export default function RosterOverview() {
             </Button>
           )}
         </header>
+
+        <nav aria-label="Schedule week" className="mb-6 flex flex-wrap items-center gap-3">
+          <Button variant="secondary" size="sm" disabled={state.kind !== "ready"} onClick={() => selectWeek(shiftRosterWeek(displayWeek, -1))} className="min-h-11">
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Previous week
+          </Button>
+          <Button variant="secondary" size="sm" disabled={state.kind !== "ready"} onClick={() => selectWeek(currentColomboWeek())} className="min-h-11">
+            <CalendarDays className="h-4 w-4" aria-hidden="true" /> Current week
+          </Button>
+          <Button variant="secondary" size="sm" disabled={state.kind !== "ready"} onClick={() => selectWeek(shiftRosterWeek(displayWeek, 1))} className="min-h-11">
+            Next week <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <p className="text-sm tabular-nums">{dateFormat.format(new Date(rosterWeekRange(displayWeek).from))} – {dateFormat.format(new Date(Date.parse(rosterWeekRange(displayWeek).to) - 1000))} · Sri Lanka time</p>
+        </nav>
 
         {state.kind === "loading" && (
           <section className="glass flex min-h-48 items-center justify-center gap-3 p-8" role="status" aria-live="polite">
@@ -195,19 +209,17 @@ export default function RosterOverview() {
           </section>
         )}
 
-        {state.kind === "ready" && <RosterData state={state} onSelectWeek={selectWeek} onRefresh={refresh} />}
+        {state.kind === "ready" && <RosterData state={state} onRefresh={refresh} />}
       </div>
     </main>
   );
 }
 
-function RosterData({ state, onSelectWeek, onRefresh }: {
+function RosterData({ state, onRefresh }: {
   state: Extract<ViewState, { kind: "ready" }>;
-  onSelectWeek: (weekStart: string) => void;
   onRefresh: () => void;
 }) {
   const { catalog, assignments, hours, audit, range } = state;
-  const weekStart = range.from.slice(0, 10);
   const lastDay = new Date(Date.parse(range.to) - 1000);
   const routeById = new Map(catalog.routes.map((route) => [route.route_id, route]));
   const truckById = new Map(catalog.trucks.map((truck) => [truck.truck_id, truck]));
@@ -215,55 +227,34 @@ function RosterData({ state, onSelectWeek, onRefresh }: {
 
   return (
     <>
-      {catalog.meta.data_source === "dev-memory" && <aside className="glass mb-8 flex items-start gap-3 p-6" aria-label="Development data notice">
-        <Info className="mt-1 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
-        <div>
-          <p className="font-semibold text-text-heading">Offline Cached Roster</p>
-          <p className="mt-1 text-sm">Running on cached operational data. Connect to live database for real-time dispatch updates.</p>
-        </div>
+      {catalog.meta.data_source === "dev-memory" && <aside className="glass mb-6 p-6" aria-label="Sample roster notice">
+        <p className="font-semibold text-text-heading">Sample roster</p>
       </aside>}
-
-      {canAssignRoster(state.session.role) && catalog.meta.data_source === "mysql" && (
-        <AssignmentForm catalog={catalog} onCreated={onRefresh} />
-      )}
+      {catalog.meta.data_source === "mysql" && <DeliveryDemand catalog={catalog} range={range}
+        writable={canAssignRoster(state.session.role)} onCreated={onRefresh} />}
       {canAssignRoster(state.session.role) && catalog.meta.data_source === "dev-memory" && (
         <aside className="glass mb-8 p-6" aria-label="Assignment creation availability">
-          <p className="font-semibold text-text-heading">Assignment creation needs the roster database</p>
-          <p className="mt-1 text-sm">Live roster assignments require an active database connection.</p>
+          <p className="font-semibold text-text-heading">Assignments unavailable while the live roster is disconnected.</p>
         </aside>
       )}
 
+
+      {catalog.meta.data_source === "dev-memory" && (
       <section aria-labelledby="schedule-title" className="mb-12">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="schedule-title" className="text-[clamp(1.5rem,3vw,2rem)]">Delivery schedule</h2>
             <p className="mt-2 text-sm">{dateFormat.format(new Date(range.from))} – {dateFormat.format(lastDay)} · Sri Lanka time (Asia/Colombo)</p>
-            {catalog.meta.data_source === "dev-memory" && (
-              <p className="mt-1 text-sm">Showing the current weekly schedule.</p>
-            )}
           </div>
           <p className="text-sm tabular-nums">{assignments.length} {assignments.length === 1 ? "assignment" : "assignments"}</p>
         </div>
 
-        {catalog.meta.data_source === "mysql" && (
-          <nav aria-label="Schedule week" className="mb-5 flex flex-wrap gap-3">
-            <Button variant="secondary" size="sm" onClick={() => onSelectWeek(shiftRosterWeek(weekStart, -1))} className="min-h-11 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-600">
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Previous week
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => onSelectWeek(currentColomboWeek())} className="min-h-11 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-600">
-              <CalendarDays className="h-4 w-4" aria-hidden="true" /> Current week
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => onSelectWeek(shiftRosterWeek(weekStart, 1))} className="min-h-11 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-600">
-              Next week <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </nav>
-        )}
+
 
         {assignments.length === 0 ? (
           <div className="glass p-8" role="status">
             <CalendarDays className="mb-4 h-6 w-6 text-green-700" aria-hidden="true" />
             <h3 className="text-xl">No assignments this week</h3>
-            <p className="mt-2">The roster service returned no delivery schedules for this date range.</p>
           </div>
         ) : (
           <ul className="grid gap-5 md:grid-cols-2" aria-label="Delivery assignments">
@@ -293,14 +284,14 @@ function RosterData({ state, onSelectWeek, onRefresh }: {
           </ul>
         )}
       </section>
+      )}
 
       <WeeklyHours state={hours} staff={[...catalog.drivers, ...catalog.assistants]} />
 
       <AttemptHistory state={audit} />
 
       <section aria-labelledby="catalog-title">
-        <h2 id="catalog-title" className="text-[clamp(1.5rem,3vw,2rem)]">Roster resources</h2>
-        <p className="mt-2 mb-5 text-sm">Catalog entries do not guarantee availability for a delivery.</p>
+        <h2 id="catalog-title" className="mb-5 text-[clamp(1.5rem,3vw,2rem)]">Roster resources</h2>
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
           <CatalogCard title="Routes" icon="routes" items={catalog.routes.map((route) => ({ id: route.route_id, name: route.route_name, detail: `Maximum ${durationLabel(route.max_duration_seconds)}` }))} />
           <CatalogCard title="Trucks" icon="trucks" items={catalog.trucks.map((truck) => ({ id: truck.truck_id, name: truck.plate_number, detail: truck.is_active ? "Active" : "Inactive" }))} />

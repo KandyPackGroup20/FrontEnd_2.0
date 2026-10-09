@@ -20,7 +20,6 @@ export default function AttemptHistory({ state }: { state: ReportState<RosterAud
     <section aria-labelledby="attempt-history-title" className="mb-12">
       <div className="mb-5">
         <h2 id="attempt-history-title" className="text-[clamp(1.5rem,3vw,2rem)]">Accepted assignment history</h2>
-        <p className="mt-2 text-sm">The 50 newest accepted assignments, independent of the selected week. Rejected requests are not saved.</p>
       </div>
 
       {state.kind === "loading" && (
@@ -31,7 +30,7 @@ export default function AttemptHistory({ state }: { state: ReportState<RosterAud
       )}
 
       {state.kind === "error" && (
-        <div className="glass p-6" role="status" aria-live="polite">
+        <div className="glass p-6" role="alert">
           <AlertTriangle className="mb-3 h-6 w-6 text-status-pending" aria-hidden="true" />
           <h3 className="text-lg">Accepted assignment history unavailable</h3>
           <p className="mt-2 text-sm">{state.message}</p>
@@ -42,7 +41,6 @@ export default function AttemptHistory({ state }: { state: ReportState<RosterAud
         <div className="glass p-6" role="status">
           <ClipboardClock className="mb-3 h-6 w-6 text-green-700" aria-hidden="true" />
           <h3 className="text-lg">No accepted assignments recorded</h3>
-          <p className="mt-2 text-sm">Accepted assignments will appear here after they are saved.</p>
         </div>
       )}
 
@@ -54,7 +52,7 @@ export default function AttemptHistory({ state }: { state: ReportState<RosterAud
                 <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm text-text-muted">Audit record #{attempt.audit_id}</p>
-                    <h3 className="mt-1 text-lg">{timeValue(attempt.occurred_at)}</h3>
+                    <h3 className="mt-1 text-lg">{attempt.route_name ?? idValue("Route", attempt.attempted_route_id)}</h3>
                   </div>
                   <span className="status-pill status-pill-delivered">
                     {attempt.outcome.toLowerCase().replaceAll("_", " ")}
@@ -62,13 +60,14 @@ export default function AttemptHistory({ state }: { state: ReportState<RosterAud
                 </div>
 
                 <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                  <div><dt className="text-text-muted">Actor</dt><dd className="mt-1 text-text-heading">{attempt.actor_name ?? `User #${attempt.actor_id}`}</dd></div>
-                  <div><dt className="text-text-muted">Route</dt><dd className="mt-1 text-text-heading">{idValue("Route", attempt.attempted_route_id)}</dd></div>
-                  <div><dt className="text-text-muted">Truck</dt><dd className="mt-1 text-text-heading">{idValue("Truck", attempt.attempted_truck_id)}</dd></div>
-                  <div><dt className="text-text-muted">Driver</dt><dd className="mt-1 text-text-heading">{idValue("Staff", attempt.attempted_driver_id)}</dd></div>
-                  <div><dt className="text-text-muted">Assistant</dt><dd className="mt-1 text-text-heading">{idValue("Staff", attempt.attempted_assistant_id)}</dd></div>
-                  <div><dt className="text-text-muted">Requested start</dt><dd className="mt-1 text-text-heading tabular-nums">{timeValue(attempt.attempted_start_time)}</dd></div>
-                  <div><dt className="text-text-muted">Requested end</dt><dd className="mt-1 text-text-heading tabular-nums">{timeValue(attempt.attempted_end_time)}</dd></div>
+                  <div><dt className="text-text-muted">Station</dt><dd className="mt-1 text-text-heading">{attempt.station_name ?? idValue("Station", attempt.station_id ?? null)}</dd></div>
+                  <div><dt className="text-text-muted">Truck</dt><dd className="mt-1 text-text-heading">{attempt.plate_number ?? idValue("Truck", attempt.attempted_truck_id)}</dd></div>
+                  <div><dt className="text-text-muted">Driver</dt><dd className="mt-1 text-text-heading">{attempt.driver_name ?? idValue("Staff", attempt.attempted_driver_id)}</dd></div>
+                  <div><dt className="text-text-muted">Assistant</dt><dd className="mt-1 text-text-heading">{attempt.assistant_name ?? idValue("Staff", attempt.attempted_assistant_id)}</dd></div>
+                  <div><dt className="text-text-muted">Dispatcher</dt><dd className="mt-1 text-text-heading">{attempt.actor_name ?? `User #${attempt.actor_id}`}</dd></div>
+                  <div><dt className="text-text-muted">Scheduled start</dt><dd className="mt-1 text-text-heading tabular-nums">{timeValue(attempt.attempted_start_time)}</dd></div>
+                  <div><dt className="text-text-muted">Scheduled end</dt><dd className="mt-1 text-text-heading tabular-nums">{timeValue(attempt.attempted_end_time)}</dd></div>
+                  <div><dt className="text-text-muted">Accepted</dt><dd className="mt-1 text-text-heading tabular-nums">{timeValue(attempt.occurred_at)}</dd></div>
                   <div><dt className="text-text-muted">Assignment</dt><dd className="mt-1 text-text-heading">{idValue("Assignment", attempt.assignment_id)}</dd></div>
                 </dl>
               </li>

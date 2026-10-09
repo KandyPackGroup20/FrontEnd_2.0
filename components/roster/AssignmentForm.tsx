@@ -3,11 +3,15 @@
 import { FormEvent, ReactNode, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
 import { createRosterAssignment, RosterApiError, serializeColomboDateTime } from "@/lib/roster/api";
-import type { RosterCandidates } from "@/lib/roster/types";
+import type { CargoOrder, RosterCandidates, StationStore } from "@/lib/roster/types";
 
 interface AssignmentFormProps {
   catalog: RosterCandidates;
   onCreated: () => Promise<void> | void;
+  stores: StationStore[];
+  stationId: string;
+  onStoreChange: (value: string) => void;
+  demand: CargoOrder[];
 }
 
 function newRequestKey(): string {
@@ -15,7 +19,7 @@ function newRequestKey(): string {
   return uuid ? `roster-${uuid}` : `roster-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export default function AssignmentForm({ catalog, onCreated }: AssignmentFormProps) {
+export default function AssignmentForm({ catalog, onCreated, stores, stationId, onStoreChange, demand }: AssignmentFormProps) {
   const [routeId, setRouteId] = useState("");
   const [truckId, setTruckId] = useState("");
   const [driverId, setDriverId] = useState("");
@@ -26,6 +30,8 @@ export default function AssignmentForm({ catalog, onCreated }: AssignmentFormPro
   const [message, setMessage] = useState<string | null>(null);
   const requestKey = useRef<string | null>(null);
   const submittingRef = useRef(false);
+  const selectedTruck = catalog.trucks.find((truck) => String(truck.truck_id) === truckId);
+  const routeDemand = demand.filter((order) => String(order.route_id) === routeId && order.eligible);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,17 +73,24 @@ export default function AssignmentForm({ catalog, onCreated }: AssignmentFormPro
   return (
     <section aria-labelledby="assignment-form-title" className="glass mb-12 p-6 sm:p-8">
       <div className="mb-6">
-        <h2 id="assignment-form-title" className="text-[clamp(1.5rem,3vw,2rem)]">Create assignment</h2>
-        <p className="mt-2 text-sm">All times are Sri Lanka time (Asia/Colombo, +05:30). Availability and roster rules are checked by the server.</p>
+        <h2 id="assignment-form-title" className="text-[clamp(1.5rem,3vw,2rem)]">Create truck schedule</h2>
       </div>
 
       <form onSubmit={submit} className="grid gap-5 md:grid-cols-2">
+        <Field label="Station store" id="schedule-store">
+          <select id="schedule-store" value={stationId} disabled={submitting} required className="input"
+            onChange={(event) => { setRouteId(""); onStoreChange(event.target.value); }}>
+            <option value="">Select station store</option>{stores.map((store) => <option key={store.station_id} value={store.station_id}>{store.station_name}</option>)}
+          </select>
+        </Field>
         <Field label="Route" id="roster-route">
           <select id="roster-route" value={routeId} onChange={(event) => setRouteId(event.target.value)} disabled={submitting} required className="input">
             <option value="">Select route</option>
-            {catalog.routes.map((route) => <option key={route.route_id} value={route.route_id}>{route.route_name}</option>)}
+            {catalog.routes.filter((route) => route.station_id === stationId).map((route) => <option key={route.route_id} value={route.route_id}>{route.route_name}</option>)}
           </select>
         </Field>
+        <p className="md:col-span-2 text-sm">{routeId ? `${routeDemand.length} receipt-eligible whole orders on this route in the selected week.` : "Select a route to view its demand."}
+          {selectedTruck && ` Truck capacity: ${selectedTruck.capacity ?? "Unavailable"} ${selectedTruck.capacity_unit === "KG" ? "kg" : "(unit unverified)"}.`}</p>
         <Field label="Truck" id="roster-truck">
           <select id="roster-truck" value={truckId} onChange={(event) => setTruckId(event.target.value)} disabled={submitting} required className="input">
             <option value="">Select truck</option>
@@ -106,7 +119,7 @@ export default function AssignmentForm({ catalog, onCreated }: AssignmentFormPro
         <div className="md:col-span-2 flex flex-wrap items-center gap-4">
           <button type="submit" disabled={submitting} className="btn-primary px-7 py-3 text-[0.9375rem] disabled:cursor-not-allowed disabled:opacity-60">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
-            {submitting ? "Creating assignment…" : "Create assignment"}
+            {submitting ? "Creating truck schedule…" : "Create truck schedule"}
           </button>
           {message && <p role="status" aria-live="polite" className="text-sm">{message}</p>}
         </div>

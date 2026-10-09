@@ -57,6 +57,8 @@ const hours = {
 };
 const acceptedAudit = {
   audit_id: 3, actor_id: 10, actor_name: "Dispatcher",
+  route_name: "Colombo North", station_id: 17, station_name: "Colombo",
+  plate_number: "WP-CAB-1001", driver_name: "Former Driver", assistant_name: "Former Assistant",
   attempted_route_id: 1, attempted_truck_id: 1, attempted_driver_id: 1, attempted_assistant_id: 2,
   attempted_start_time: "2026-09-22T09:00:00+05:30", attempted_end_time: "2026-09-22T10:00:00+05:30",
   attempted_duration_seconds: 3600, outcome: "ACCEPTED", reason_code: null,
@@ -506,12 +508,46 @@ test("assignment success refreshes all authoritative views without browser polic
   ]);
   assert.match(form, /const result = await createRosterAssignment/);
   assert.match(form, /await onCreated\(\)/);
-  assert.match(overview, /<AssignmentForm catalog=\{catalog\} onCreated=\{onRefresh\}/);
+  assert.match(overview, /<DeliveryDemand catalog=\{catalog\} range=\{range\}/);
+  assert.match(overview, /onCreated=\{onRefresh\}/);
   assert.match(overview, /getRosterAssignments\(range, signal\)/);
   assert.match(overview, /getRosterHours\(weekStart, signal\)/);
   assert.match(overview, /getRosterAudit\(signal, 50\)/);
   assert.doesNotMatch(source, /144000|216000/);
   assert.doesNotMatch(weekly, /144000|216000/);
+});
+
+test("weekly hours render populated and zero weeks, loading, errors and empty results distinctly", async () => {
+  const componentSource = await readFile(new URL("../components/roster/WeeklyHours.tsx", import.meta.url), "utf8");
+  const compiled = ts.transpileModule(componentSource, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  });
+  const require = createRequire(import.meta.url);
+  const exports = {};
+  new Function("require", "exports", compiled.outputText)(require, exports);
+  const { createElement } = require("react");
+  const { renderToStaticMarkup } = require("react-dom/server");
+  const render = (state) => renderToStaticMarkup(createElement(exports.default, { state, staff: [] }));
+  const populated = { ...hours, hours: [
+    { staff_id: 1, staff_name: "Driver Kasun", staff_type: "DRIVER", scheduled_seconds: 7200, limit_seconds: 144000, remaining_seconds: 136800 },
+    { staff_id: 4, staff_name: "Assistant Pathum", staff_type: "ASSISTANT", scheduled_seconds: 7200, limit_seconds: 216000, remaining_seconds: 208800 },
+  ] };
+  const ready = render({ kind: "ready", data: populated });
+  for (const label of ["Driver Kasun", "Assistant Pathum", ">Driver<", ">Assistant<", "2 h", "40 h", "60 h", "38 h", "58 h"]) {
+    assert.ok(ready.includes(label), label);
+  }
+  assert.doesNotMatch(ready, /calculated by the roster service/);
+  const zero = render({ kind: "ready", data: { ...populated,
+    hours: populated.hours.map((row) => ({ ...row, scheduled_seconds: 0, remaining_seconds: row.limit_seconds })),
+  } });
+  assert.equal((zero.match(/>0 h</g) ?? []).length, 2);
+  assert.match(zero, /Driver Kasun/);
+  assert.match(render({ kind: "loading" }), /Loading weekly hours/);
+  const failure = render({ kind: "error", message: "Permission denied" });
+  assert.match(failure, /role="alert"/);
+  assert.match(failure, /Permission denied/);
+  assert.doesNotMatch(failure, /0 h|Within limit/);
+  assert.match(render({ kind: "ready", data: { ...hours, hours: [] } }), /No staff to report this week/);
 });
 
 test("accepted history renders saved facts without rejection or historical policy claims", async () => {
@@ -527,11 +563,85 @@ test("accepted history renders saved facts without rejection or historical polic
   const render = (state) => renderToStaticMarkup(createElement(exports.default, { state }));
   const ready = render({ kind: "ready", data: audit });
   assert.match(ready, /Accepted assignment history/);
-  assert.match(ready, /Rejected requests are not saved/);
+  assert.doesNotMatch(ready, /Rejected requests are not saved|independent of the selected week/);
+  for (const label of ["Colombo North", "Colombo", "WP-CAB-1001", "Former Driver", "Former Assistant", "Dispatcher", "Scheduled start", "Scheduled end", "Accepted"]) {
+    assert.ok(ready.includes(label));
+  }
+  const unresolved = render({ kind: "ready", data: { ...audit, attempts: [{ ...acceptedAudit,
+    route_name: null, station_name: null, plate_number: null, driver_name: null, assistant_name: null, actor_name: null,
+  }] } });
+  for (const label of ["Route #1", "Station #17", "Truck #1", "Staff #1", "Staff #2", "User #10"]) {
+    assert.ok(unresolved.includes(label));
+  }
   assert.match(ready, /Audit record #3/);
   assert.match(ready, /Assignment #501/);
   assert.doesNotMatch(ready, />Policy<|Rejection reason|Legacy record|TRUCK_OVERLAP/);
   assert.match(render({ kind: "ready", data: { ...audit, attempts: [] } }), /No accepted assignments recorded/);
   assert.match(render({ kind: "loading" }), /Loading accepted assignment history/);
   assert.match(render({ kind: "error", message: "Service unavailable" }), /Accepted assignment history unavailable/);
+});
+
+const cargoOrder = {
+  order_id: 1001, delivery_date: '2026-11-01', order_status: 'SCHEDULED_FOR_RAIL',
+  route_id: 1, route_name: 'Saved route', station_id: 1, station_name: 'Colombo',
+  customer_name: 'Customer', recipient_name: 'Saved recipient', recipient_phone: '0112345678',
+  delivery_address: 'Saved street', assigned_roster_id: null, delivery_id: null,
+  assigned_weight_kg: null, weight_kg: '100.00', eligible: true, blocked_reasons: [],
+  items: [{ order_id: 1001, order_item_id: 1, product_id: 1, product_name: 'Tea crate',
+    ordered_quantity: 4, allocated_quantity: 4, received_quantity: 4, wrong_destination: 0, unit_weight_kg: '25.00' }],
+};
+const truckSchedule = {
+  roster_id: 42, route_id: 1, station_id: 1, station_name: 'Colombo', route_name: 'Saved route',
+  truck_id: 1, plate_number: 'WP-CAB-1001', capacity: '150.00', capacity_unit: 'KG', is_active: true,
+  driver_id: 1, driver_name: 'Driver', assistant_id: 4, assistant_name: 'Assistant',
+  start_time: '2026-11-01T09:00:00+05:30', end_time: '2026-11-01T10:00:00+05:30',
+  status: 'SCHEDULED', order_count: 1, unit_count: 4, cargo_weight_kg: '100.00',
+};
+
+test('cargo demand validates item quantities and receipt eligibility instead of inferring arrival', async () => {
+  mock.method(globalThis, 'fetch', async () => jsonResponse({ orders: [cargoOrder], timezone: 'Asia/Colombo' }));
+  assert.deepEqual(await api.getCargoDemand(1, '2026-11-01', '2026-11-01', signal()), [cargoOrder]);
+  mock.restoreAll();
+  mock.method(globalThis, 'fetch', async () => jsonResponse({ orders: [{ ...cargoOrder, eligible: true, blocked_reasons: ['ORDER_NOT_FULLY_RECEIVED'] }], timezone: 'Asia/Colombo' }));
+  await assert.rejects(api.getCargoDemand(1, '2026-11-01', '2026-11-01', signal()), { code: 'INVALID_RESPONSE' });
+});
+
+test('loading lists require links to the requested schedule and retain saved destinations', async () => {
+  const linked = { ...cargoOrder, assigned_roster_id: 42, delivery_id: 1, assigned_weight_kg: '100.00', eligible: false, blocked_reasons: ['ORDER_ALREADY_ASSIGNED'] };
+  mock.method(globalThis, 'fetch', async () => jsonResponse({ schedule: truckSchedule, orders: [linked], timezone: 'Asia/Colombo' }));
+  assert.equal((await api.getLoadingList(42, signal())).orders[0].delivery_address, 'Saved street');
+  await assert.rejects(api.getLoadingList(43, signal()), { code: 'INVALID_RESPONSE' });
+});
+
+test('whole-order PUT uses authenticated no-store transport and safely accepts membership replay', async () => {
+  const request = mock.method(globalThis, 'fetch', async () => jsonResponse({ status: 'SUCCESS', result_code: 'ORDERS_ALREADY_ASSIGNED', roster_id: 42, order_ids: [1001], cargo_weight_kg: '100.00', timezone: 'Asia/Colombo' }));
+  await api.assignWholeOrders(42, [1001]);
+  const [path, options] = request.mock.calls[0].arguments;
+  assert.equal(path, '/api/v1/roster/schedules/42/orders');
+  assert.equal(options.method, 'PUT');
+  assert.equal(options.credentials, 'same-origin');
+  assert.equal(options.cache, 'no-store');
+  assert.deepEqual(JSON.parse(options.body), { order_ids: [1001] });
+  assert.equal(options.headers['Idempotency-Key'], undefined);
+  await assert.rejects(api.assignWholeOrders(42, [1001, 1001]), RangeError);
+  assert.equal(request.mock.calls.length, 1);
+});
+
+test('cargo technical failures retain one explicit attempt and business codes', async () => {
+  const request = mock.method(globalThis, 'fetch', async () => jsonResponse({ detail: { error_code: 'TRUCK_CAPACITY_EXCEEDED', message: 'Whole orders exceed capacity.' } }, 409));
+  await assert.rejects(api.assignWholeOrders(42, [1001]), { code: 'TRUCK_CAPACITY_EXCEEDED', status: 409 });
+  assert.equal(request.mock.calls.length, 1);
+});
+
+test('loading-list order details render saved destinations, products, quantities and blocked reasons', async () => {
+  const componentSource = await readFile(new URL('../components/roster/LoadingList.tsx', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(componentSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
+  const require = createRequire(import.meta.url);
+  const componentModule = { exports: {} };
+  const resolve = (name) => name === '@/lib/roster/api' ? {} : require(name);
+  new Function('require', 'module', 'exports', compiled.outputText)(resolve, componentModule, componentModule.exports);
+  const { createElement } = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const html = renderToStaticMarkup(createElement(componentModule.exports.OrderDetails, { order: { ...cargoOrder, eligible: false, blocked_reasons: ['ORDER_NOT_FULLY_RECEIVED'] } }));
+  for (const text of ['Saved recipient', 'Saved street', 'Tea crate', '>4<', 'All ordered goods must be received']) assert.ok(html.includes(text), text);
 });
