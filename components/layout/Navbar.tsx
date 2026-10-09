@@ -155,7 +155,7 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Button variant="secondary" size="sm" href="/" id="nav-sign-in">
+                <Button variant="secondary" size="sm" href="/login" id="nav-sign-in">
                   Sign in
                 </Button>
                 <Button variant="primary" size="sm" href="/register" id="nav-get-started">
@@ -232,7 +232,7 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
-                  <Button variant="secondary" href="/" id="nav-mobile-sign-in">
+                  <Button variant="secondary" href="/login" id="nav-mobile-sign-in">
                     Sign in
                   </Button>
                   <Button variant="primary" href="/register" id="nav-mobile-get-started">

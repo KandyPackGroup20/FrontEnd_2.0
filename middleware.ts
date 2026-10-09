@@ -41,7 +41,7 @@ export function middleware(request: NextRequest) {
   const isAdminRoute = pathname.startsWith('/admin');
   if (isAdminRoute) {
     if (!isAuthenticated) {
-      const loginUrl = new URL('/', request.url);
+      const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
@@ -73,7 +73,7 @@ export function middleware(request: NextRequest) {
 
   // Case A: Unauthenticated user trying to access protected customer routes
   if (isProtectedRoute && !isAuthenticated) {
-    const loginUrl = new URL('/', request.url);
+    const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }

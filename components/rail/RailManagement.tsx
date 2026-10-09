@@ -177,7 +177,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
           }
           setCurrentUser(u);
         } else if (res.status === 401) {
-          router.replace("/?redirect=/admin/rail");
+          router.replace("/login?redirect=/admin/rail");
         } else {
           setCurrentUser(null);
         }
@@ -285,7 +285,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
           </p>
           <div className="flex flex-col gap-2">
             <Link
-              href="/?redirect=/admin/rail"
+              href="/login?redirect=/admin/rail"
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm shadow-sm transition-all"
             >
               Sign in as Logistics Manager
