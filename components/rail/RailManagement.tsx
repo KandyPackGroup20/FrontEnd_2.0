@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Train,
   Plus,
@@ -121,6 +122,7 @@ interface RailManagementProps {
 }
 
 export default function RailManagement({ initialTab = "trips" }: RailManagementProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"trips" | "pending" | "breakdown" | "schedules" | "audit">(initialTab);
   const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
@@ -169,7 +171,13 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         const res = await fetch("/api/v1/auth/me");
         if (res.ok) {
           const u = await res.json();
+          if (u.force_password_reset) {
+            router.replace("/profile?force_reset=true");
+            return;
+          }
           setCurrentUser(u);
+        } else if (res.status === 401) {
+          router.replace("/?redirect=/admin/rail");
         } else {
           setCurrentUser(null);
         }
@@ -180,7 +188,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
       }
     }
     fetchMe();
-  }, []);
+  }, [router]);
 
   // Fetch Trips
   const loadTrips = useCallback(async () => {
@@ -277,10 +285,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
           </p>
           <div className="flex flex-col gap-2">
             <Link
-              href="/login"
+              href="/?redirect=/admin/rail"
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm shadow-sm transition-all"
             >
-              Log in as Logistics Manager
+              Sign in as Logistics Manager
             </Link>
             <Link
               href="/orders"

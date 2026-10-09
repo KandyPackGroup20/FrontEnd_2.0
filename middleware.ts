@@ -55,49 +55,16 @@ export function middleware(request: NextRequest) {
         { status: 403, headers: { 'content-type': 'application/json' } }
       );
     }
-  }
-
-  // 2. Rail Management RBAC (strict 403 for unauthorized roles)
-  if (pathname.startsWith('/admin/rail')) {
-    const railRoles = ['LOGISTICS_MGR', 'SUPERADMIN'];
-    if (!session || !railRoles.includes(session.role)) {
+    // 4.2: rail capacity management is restricted to LOGISTICS_MGR and SUPERADMIN
+    if (pathname.startsWith('/admin/rail') && !['LOGISTICS_MGR', 'SUPERADMIN'].includes(session?.role ?? '')) {
       return new NextResponse(
-        `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>403 Forbidden - Access Denied</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { background: #0b1320; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1.5rem; }
-    .card { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 1.25rem; padding: 2.5rem; max-width: 480px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); backdrop-filter: blur(12px); }
-    .badge { display: inline-block; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
-    h1 { color: #ffffff; font-size: 1.75rem; font-weight: 800; margin: 0 0 0.75rem; }
-    p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; margin: 0 0 1.5rem; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; background: #16a34a; color: #ffffff; font-weight: 600; padding: 0.75rem 1.5rem; border-radius: 0.75rem; text-decoration: none; font-size: 0.875rem; transition: background 0.2s; }
-    .btn:hover { background: #15803d; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="badge">403 Forbidden</div>
-    <h1>Access Denied</h1>
-    <p>You do not have permission to view or manage train capacity allocations. Only <strong>Logistics Managers</strong> and <strong>Superadmins</strong> are authorized.</p>
-    <a href="/orders" class="btn">&larr; Return to Orders</a>
-  </div>
-</body>
-</html>`,
-        {
-          status: 403,
-          headers: {
-            'content-type': 'text/html; charset=utf-8',
-          },
-        }
+        JSON.stringify({ error: 'FORBIDDEN_ROLE', message: 'Only Logistics Managers and Superadmins can access rail capacity management.' }),
+        { status: 403, headers: { 'content-type': 'application/json' } }
       );
     }
   }
 
-  // 3. Protected customer routes that require an authenticated session
+  // 2. Protected customer routes that require an authenticated session
   const protectedPrefixes = ['/orders', '/order', '/profile'];
   const isProtectedRoute = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
 
