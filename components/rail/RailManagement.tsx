@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { railTimestamp, railError, distinctRailTrips } from "@/lib/rail-input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -42,7 +43,7 @@ interface TrainTrip {
   used_space: number;
   remaining_space: number;
   utilisation_pct: number;
-  status: "SCHEDULED" | "CANCELLED" | "COMPLETED";
+  status: "SCHEDULED" | "CANCELLED" | "IN_TRANSIT" | "ARRIVED";
 }
 
 interface PendingOrder {
@@ -146,7 +147,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
   // Allocation Breakdown state
   const [breakdownOrderId, setBreakdownOrderId] = useState<number | "">("");
-  const [orderAllocations, setOrderAllocations] = useState<{ orderId: number; allocations: any[] } | null>(null);
+  const [orderAllocations, setOrderAllocations] = useState<{ orderId: number; allocations: OrderAllocationBreakdown["allocations"] } | null>(null);
 
   // Trip Consignments Modal
   const [tripConsignmentsModal, setTripConsignmentsModal] = useState<{ tripId: number; items: TripAllocationItem[] } | null>(null);
@@ -154,7 +155,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
   // Create Trip Modal state
   const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
   const [editTrip, setEditTrip] = useState<TrainTrip | null>(null);
-  const [newTripDestination, setNewTripDestination] = useState<number>(1);
+  const [newTripDestination, setNewTripDestination] = useState<number>(0);
+  const [railHubs, setRailHubs] = useState<{origins: Array<{station_id: number; city: string}>; destinations: Array<{station_id: number; city: string}>}>({origins: [], destinations: []});
+  const [allocationOrderId, setAllocationOrderId] = useState<number | null>(null);
+  const allocationInFlight = useRef(false);
   const [newTripDeparture, setNewTripDeparture] = useState<string>("");
   const [newTripArrival, setNewTripArrival] = useState<string>("");
   const [newTripCapacity, setNewTripCapacity] = useState<number>(50);
@@ -244,12 +248,25 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     }
   }, []);
 
+  const loadRailHubs = useCallback(async () => {
+    try {
+      const response = await fetch('/api/v1/rail/stations');
+      const data = await response.json();
+      if (!response.ok) throw new Error(railError(data.detail));
+      setRailHubs(data);
+      setNewTripDestination(current => current || data.destinations[0]?.station_id || 0);
+    } catch (error) {
+      setAlertBanner({type: 'error', message: error instanceof Error ? error.message : 'Could not load rail hubs.'});
+    }
+  }, []);
+
   const refreshAll = useCallback(() => {
+    loadRailHubs();
     loadTrips();
     loadPendingOrders();
     loadSchedules();
     loadAuditTrail();
-  }, [loadTrips, loadPendingOrders, loadSchedules, loadAuditTrail]);
+  }, [loadTrips, loadPendingOrders, loadSchedules, loadAuditTrail, loadRailHubs]);
 
   useEffect(() => {
     if (currentUser && ["LOGISTICS_MGR", "SUPERADMIN"].includes(currentUser.role)) {
@@ -311,21 +328,22 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     setAlertBanner(null);
 
     try {
+      if (!railHubs.origins.length || !newTripDestination) throw new Error('Active rail hubs must be configured before creating a trip.');
       const res = await fetch("/api/v1/rail/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          origin_station_id: 7, // Locked to Kandy
+          origin_station_id: railHubs.origins[0].station_id,
           destination_station_id: Number(newTripDestination),
-          departure_datetime: new Date(newTripDeparture).toISOString(),
-          arrival_datetime: new Date(newTripArrival).toISOString(),
+          departure_datetime: railTimestamp(newTripDeparture),
+          arrival_datetime: railTimestamp(newTripArrival),
           total_capacity: Number(newTripCapacity),
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || "Failed to create trip.");
+        throw new Error(railError(data.detail, "Failed to create trip."));
       }
 
       setAlertBanner({ type: "success", message: data.message || `Train trip #${data.trip_id} created successfully.` });
@@ -351,8 +369,8 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           total_capacity: Number(editCapacity),
-          departure_datetime: editDeparture ? new Date(editDeparture).toISOString() : undefined,
-          arrival_datetime: editArrival ? new Date(editArrival).toISOString() : undefined,
+          departure_datetime: editDeparture ? railTimestamp(editDeparture) : undefined,
+          arrival_datetime: editArrival ? railTimestamp(editArrival) : undefined,
         }),
       });
 
@@ -441,6 +459,10 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
   // 6. Allocate Rail Capacity
   async function handleAllocate(orderId: number, tripId?: number | null) {
+    if (allocationInFlight.current) return;
+    allocationInFlight.current = true;
+    setAllocationOrderId(orderId);
+    setSuitableDrawerOpen(false);
     setLoading(true);
     setAlertBanner(null);
 
@@ -457,7 +479,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
       const data = await res.json();
 
       if (!res.ok) {
-        const errorDetail = data.detail || "Allocation failed";
+        const errorDetail = railError(data.detail, "Allocation failed");
         let humanMessage = errorDetail;
         if (errorDetail.includes("INSUFFICIENT_RAIL_CAPACITY")) {
           humanMessage = "Allocation Rejected: Insufficient rail carriage capacity available before delivery cutoff date.";
@@ -493,6 +515,8 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     } catch (err: any) {
       setAlertBanner({ type: "error", message: err.message });
     } finally {
+      allocationInFlight.current = false;
+      setAllocationOrderId(null);
       setLoading(false);
     }
   }
@@ -568,10 +592,18 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
   const scheduledTripsCount = trips.filter((t) => t.status === "SCHEDULED").length;
   const pendingOrdersCount = pendingOrders.length;
   const totalPendingSpace = pendingOrders.reduce((acc, o) => acc + (o.total_required_space || 0), 0);
+  const allocationTripIds = distinctRailTrips(orderAllocations?.allocations || []);
 
   return (
     <div className="relative min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 bg-[#F5FAF7] text-slate-800">
       <GradientBlobs />
+      {allocationOrderId !== null && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="rail-allocation-title">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" role="status" aria-live="polite">
+          <RefreshCw className="mb-3 h-6 w-6 animate-spin text-green-600" />
+          <h2 id="rail-allocation-title" className="font-bold">Scheduling order #{allocationOrderId}</h2>
+          <p className="mt-2 text-sm">Checking available capacity and saving the allocation. Keep this page open; the trip breakdown will appear when the request completes.</p>
+        </div>
+      </div>}
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-6">
 
@@ -1056,13 +1088,13 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                       <div>
                         <div className="flex items-center gap-2.5">
                           <span className="font-bold text-slate-900 text-lg">Order #{orderAllocations.orderId}</span>
-                          {orderAllocations.allocations.length > 1 ? (
+                          {allocationTripIds.length > 1 ? (
                             <span className="text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full flex items-center gap-1.5">
-                              <Split className="h-3.5 w-3.5" /> Multi-Trip Spillover ({orderAllocations.allocations.length} Trains)
+                              <Split className="h-3.5 w-3.5" /> Multi-Trip Spillover ({allocationTripIds.length} Trains)
                             </span>
                           ) : (
                             <span className="text-[11px] font-bold bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full">
-                              Single Trip Booking
+                              {allocationTripIds.length === 1 ? 'Single Trip Booking' : 'Not allocated'}
                             </span>
                           )}
                         </div>
@@ -1097,14 +1129,14 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {orderAllocations.allocations.map((a, idx) => (
+                          {orderAllocations.allocations.map((a) => (
                             <tr key={a.allocation_id} className="hover:bg-slate-50/60">
                               <td className="py-3 px-3 font-mono text-slate-500 font-semibold">#{a.allocation_id}</td>
                               <td className="py-3 px-3 font-semibold text-slate-900">
                                 Train Trip #{a.trip_id}
-                                {orderAllocations.allocations.length > 1 && (
+                                {allocationTripIds.length > 1 && (
                                   <span className="text-[11px] text-amber-700 ml-2 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                    Spillover Leg {idx + 1}
+                                    Spillover Leg {allocationTripIds.indexOf(a.trip_id) + 1}
                                   </span>
                                 )}
                               </td>
@@ -1268,7 +1300,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                   <input
                     type="text"
                     disabled
-                    value="Kandy Central Goods Yard (Station #7) - Mainline Origin Enforced"
+                    value={railHubs.origins[0] ? `Kandy (Station #${railHubs.origins[0].station_id})` : "No active Kandy hub configured"}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-500 font-medium cursor-not-allowed"
                   />
                 </div>
@@ -1280,18 +1312,14 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                     onChange={(e) => setNewTripDestination(Number(e.target.value))}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-green-500"
                   >
-                    <option value={1}>Station #1: Colombo Fort Goods Shed</option>
-                    <option value={4}>Station #4: Galle Railway Station Goods Yard</option>
-                    <option value={9}>Station #9: Jaffna Central Station Goods Yard</option>
-                    <option value={12}>Station #12: Matara Terminal Shed</option>
-                    <option value={18}>Station #18: Badulla Hillside Rail Terminal</option>
-                    <option value={20}>Station #20: Anuradhapura Main Station</option>
+                    <option value={0} disabled>Select destination</option>
+                    {railHubs.destinations.map(hub => <option key={hub.station_id} value={hub.station_id}>{hub.city} (Station #{hub.station_id})</option>)}
                   </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Departure Date & Time</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Departure Date & Time (Sri Lanka)</label>
                     <input
                       type="datetime-local"
                       required
@@ -1302,7 +1330,7 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Arrival Date & Time</label>
+                    <label className="block text-slate-700 font-semibold mb-1">Arrival Date & Time (Sri Lanka)</label>
                     <input
                       type="datetime-local"
                       required
