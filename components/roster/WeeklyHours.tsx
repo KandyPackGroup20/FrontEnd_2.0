@@ -20,7 +20,6 @@ export default function WeeklyHours({ state, staff }: {
     <section aria-labelledby="weekly-hours-title" className="mb-12">
       <div className="mb-5">
         <h2 id="weekly-hours-title" className="text-[clamp(1.5rem,3vw,2rem)]">Weekly staff hours</h2>
-        <p className="mt-2 text-sm">Scheduled time is calculated by the roster service for the selected Colombo week.</p>
       </div>
 
       {state.kind === "loading" && (
@@ -31,7 +30,7 @@ export default function WeeklyHours({ state, staff }: {
       )}
 
       {state.kind === "error" && (
-        <div className="glass p-6" role="status" aria-live="polite">
+        <div className="glass p-6" role="alert">
           <AlertTriangle className="mb-3 h-6 w-6 text-status-pending" aria-hidden="true" />
           <h3 className="text-lg">Weekly hours unavailable</h3>
           <p className="mt-2 text-sm">{state.message}</p>
@@ -41,8 +40,7 @@ export default function WeeklyHours({ state, staff }: {
       {state.kind === "ready" && state.data.hours.length === 0 && (
         <div className="glass p-6" role="status">
           <Clock3 className="mb-3 h-6 w-6 text-green-700" aria-hidden="true" />
-          <h3 className="text-lg">No scheduled staff hours</h3>
-          <p className="mt-2 text-sm">No counted duties were returned for this selected week.</p>
+          <h3 className="text-lg">No staff to report this week</h3>
         </div>
       )}
 
@@ -54,8 +52,8 @@ export default function WeeklyHours({ state, staff }: {
               <li key={`${row.staff_id}-${row.staff_type}`} className="glass p-6">
                 <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm text-text-muted">{row.staff_type}</p>
-                    <h3 className="mt-1 text-xl">{staffById.get(row.staff_id)?.name ?? `Staff #${row.staff_id}`}</h3>
+                    <p className="text-sm text-text-muted">{row.staff_type === "DRIVER" ? "Driver" : "Assistant"}</p>
+                    <h3 className="mt-1 text-xl">{row.staff_name ?? staffById.get(row.staff_id)?.name ?? `Staff #${row.staff_id}`}</h3>
                   </div>
                   <span className={exceeded
                     ? "status-pill status-pill-issue"

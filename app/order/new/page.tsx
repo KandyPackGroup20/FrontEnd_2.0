@@ -175,6 +175,7 @@ export default function NewOrderPage() {
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<string | null>(null);
   const [notifiedManagersCount, setNotifiedManagersCount] = useState<number>(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -257,7 +258,12 @@ export default function NewOrderPage() {
   const grandTotal = totalGoodsValue + freightTariff;
 
   async function handleConfirm() {
-    if (selectedItemsList.length === 0) return;
+    if (selectedItemsList.length === 0 || isSubmitting) return;
+    setSubmissionError(null);
+    if (![recipientName, recipientPhone, deliveryAddress].every((value) => value.trim())) {
+      setSubmissionError("Provide the recipient name, phone and delivery address before checkout.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const itemsPayload = selectedItemsList.map((i) => ({
@@ -273,9 +279,9 @@ export default function NewOrderPage() {
           cargo_type: selectedItemsList[0]?.category || "General",
           cargo_description: selectedItemsList.map((i) => `${i.product_name} (${i.quantity})`).join(", "),
           weight_kg: totalWeightKg,
-          recipient_name: recipientName || "Lanka Commercial Partner",
-          recipient_phone: recipientPhone || "0771234567",
-          delivery_address: deliveryAddress || currentHub.station,
+          recipient_name: recipientName.trim(),
+          recipient_phone: recipientPhone.trim(),
+          delivery_address: deliveryAddress.trim(),
           booking_date: bookingDate,
           slot: slot,
           items: itemsPayload,
@@ -290,16 +296,12 @@ export default function NewOrderPage() {
           window.dispatchEvent(new CustomEvent("kandypack:order_placed"));
         }
       } else {
-        const fallbackCode = `KP-${Math.floor(10000 + Math.random() * 90000)}-${currentHub.id}`;
-        setCompletedOrder(fallbackCode);
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("kandypack:order_placed"));
-        }
+        const data = await res.json().catch(() => null);
+        const detail = data?.detail;
+        throw new Error(typeof detail === "string" ? detail : detail?.message ?? "Order could not be saved. Check the destination details and retry.");
       }
-    } catch (e) {
-      console.error(e);
-      const fallbackCode = `KP-${Math.floor(10000 + Math.random() * 90000)}-${currentHub.id}`;
-      setCompletedOrder(fallbackCode);
+    } catch (error: unknown) {
+      setSubmissionError(error instanceof Error ? error.message : "Order could not be saved.");
     } finally {
       setIsSubmitting(false);
     }
@@ -308,6 +310,7 @@ export default function NewOrderPage() {
   return (
     <div className="relative min-h-screen pb-24 pt-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-green-50/40 via-white to-green-50/20">
       <GradientBlobs />
+      {submissionError && <p role="alert" className="relative mx-auto mb-5 max-w-5xl rounded-2xl border border-green-200 bg-green-50 p-4">{submissionError}</p>}
 
       {/* Top Bar */}
       <div className="mx-auto max-w-5xl mb-8 flex items-center justify-between">
@@ -722,6 +725,7 @@ export default function NewOrderPage() {
                       <input
                         type="text"
                         value={recipientName}
+                          maxLength={255} required
                         onChange={(e) => setRecipientName(e.target.value)}
                         placeholder="e.g. Lanka Wholesale Stores Ltd"
                         className="w-full rounded-xl bg-white border border-green-200 px-3 py-2 text-xs text-text-heading placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-600 shadow-xs"
@@ -735,6 +739,7 @@ export default function NewOrderPage() {
                       <input
                         type="text"
                         value={recipientPhone}
+                          maxLength={30} required
                         onChange={(e) => setRecipientPhone(e.target.value)}
                         placeholder="e.g. 0771234567"
                         className="w-full rounded-xl bg-white border border-green-200 px-3 py-2 text-xs text-text-heading placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-600 shadow-xs"
@@ -748,6 +753,7 @@ export default function NewOrderPage() {
                       <input
                         type="text"
                         value={deliveryAddress}
+                          maxLength={500} required
                         onChange={(e) => setDeliveryAddress(e.target.value)}
                         placeholder="e.g. Colombo 03, Station Yard"
                         className="w-full rounded-xl bg-white border border-green-200 px-3 py-2 text-xs text-text-heading placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-600 shadow-xs"
@@ -764,7 +770,7 @@ export default function NewOrderPage() {
                       <ArrowLeft className="h-4 w-4" /> Back to Catalogue
                     </button>
 
-                    <Button variant="primary" size="md" onClick={() => setStep(3)}>
+                    <Button variant="primary" size="md" disabled={![recipientName, recipientPhone, deliveryAddress].every((value) => value.trim())} onClick={() => setStep(3)}>
                       Next: Rail Schedule
                       <ArrowRight className="h-4 w-4 ml-1.5" />
                     </Button>
@@ -909,9 +915,9 @@ export default function NewOrderPage() {
                       <div className="text-[11px] font-bold text-green-800 uppercase tracking-wider mb-2">
                         Recipient & Destination
                       </div>
-                      <div><strong>Recipient:</strong> {recipientName || "Lanka Commercial Partner"}</div>
-                      <div><strong>Contact:</strong> {recipientPhone || "0771234567"}</div>
-                      <div><strong>Delivery Address:</strong> {deliveryAddress || currentHub.station}</div>
+                      <div><strong>Recipient:</strong> {recipientName || "Not provided"}</div>
+                      <div><strong>Contact:</strong> {recipientPhone || "Not provided"}</div>
+                      <div><strong>Delivery Address:</strong> {deliveryAddress || "Not provided"}</div>
                     </div>
                   </div>
 

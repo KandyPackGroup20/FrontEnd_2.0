@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, ArrowRight, Train, Loader2, AlertCircle } from "lucide-react";
+import { Train, AlertCircle, Mail, Lock, Loader2, ArrowRight } from "lucide-react";
 import { setAuthToken } from "@/lib/api";
 
 function Form() {
