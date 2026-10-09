@@ -270,29 +270,43 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
     );
   }
 
+  async function handleSwitchToLogistics() {
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" });
+    } catch {
+      // quiet
+    }
+    window.location.href = "/login?redirect=/admin/rail";
+  }
+
   const isAuthorized = currentUser && ["LOGISTICS_MGR", "SUPERADMIN"].includes(currentUser.role);
   if (!isAuthorized) {
     return (
       <div className="relative min-h-screen flex items-center justify-center p-6 bg-[#F5FAF7]">
         <GradientBlobs />
-        <div className="relative z-10 bg-white/90 backdrop-blur-2xl border border-red-200 rounded-3xl p-8 max-w-md text-center shadow-xl">
+        <div className="relative z-10 bg-white/95 backdrop-blur-2xl border border-red-200 rounded-3xl p-8 max-w-md text-center shadow-xl">
           <div className="h-14 w-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-100">
             <ShieldAlert className="h-7 w-7" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">403 Forbidden - Access Denied</h2>
           <p className="text-sm text-slate-600 mb-6 leading-relaxed">
             The Rail Capacity & Allocation portal is restricted exclusively to <strong>Logistics Managers</strong> and <strong>Superadmins</strong>.
+            {currentUser && (
+              <span className="block mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-1 px-2 font-mono">
+                Currently logged in as: {currentUser.email} ({currentUser.role})
+              </span>
+            )}
           </p>
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/login?redirect=/admin/rail"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm shadow-sm transition-all"
+          <div className="flex flex-col gap-2.5">
+            <button
+              onClick={handleSwitchToLogistics}
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm shadow-md transition-all cursor-pointer"
             >
-              Sign in as Logistics Manager
-            </Link>
+              Log in as Logistics Manager
+            </button>
             <Link
               href="/orders"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-all"
+              className="w-full inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-all"
             >
               Back to Orders Dashboard
             </Link>
