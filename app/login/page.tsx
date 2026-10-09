@@ -10,7 +10,8 @@ import { setAuthToken } from "@/lib/api";
 function Form() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get("redirect") || "/orders";
+  const candidate = searchParams.get("redirect") || "/orders";
+  const redirectTarget = candidate.startsWith("/") && !candidate.startsWith("//") && !candidate.includes("\\") ? candidate : "/orders";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +32,7 @@ function Form() {
 
     try {
       const cleanEmail = email.trim();
-      const portalType = cleanEmail.endsWith("@kandypack.lk") ? "admin" : "customer";
+      const portalType = window.location.hostname.startsWith("admin.") ? "admin" : "customer";
 
       const res = await fetch("/api/v1/auth/login", {
         method: "POST",
@@ -59,14 +60,21 @@ function Form() {
         );
       }
 
-      if (data?.access_token && typeof data.access_token === "string") {
-        setAuthToken(data.access_token);
-      }
+      // Discard legacy browser-readable tokens; authentication uses the HttpOnly cookie.
+      setAuthToken(null);
 
       setSuccess(true);
       setTimeout(() => {
         const role = data?.role as string | undefined;
-        if (role === "STORE_MGR" || role === "WAREHOUSE_STAFF") {
+        if (data?.force_password_reset) {
+          router.push("/profile?force_reset=true");
+        } else if (role === "SUPERADMIN") {
+          router.push("/admin/users");
+        } else if (role === "LOGISTICS_MGR") {
+          router.push("/admin/rail");
+        } else if (role === "DISPATCHER") {
+          router.push("/admin/roster");
+        } else if (role === "STORE_MGR" || role === "WAREHOUSE_STAFF") {
           router.push("/warehouse");
         } else if (role === "SUPERADMIN" || data?.force_password_reset) {
           router.push("/profile");

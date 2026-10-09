@@ -71,7 +71,8 @@ function ProfileContent() {
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffEmail, setNewStaffEmail] = useState("");
   const [newStaffRole, setNewStaffRole] = useState("DISPATCHER");
-  const [newStaffPassword, setNewStaffPassword] = useState("password123");
+  const [newStaffPassword, setNewStaffPassword] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [staffSuccess, setStaffSuccess] = useState("");
@@ -89,6 +90,8 @@ function ProfileContent() {
       if (res.ok) {
         const data = await res.json();
         setUsersList(data);
+      } else {
+        setStaffError("Could not load the staff directory. Complete any required password reset and retry.");
       }
     } catch (e) {
       console.error(e);
@@ -125,6 +128,8 @@ function ProfileContent() {
   }, [router]);
 
   useEffect(() => {
+    // loadProfile awaits the API before updating profile state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProfile();
   }, [loadProfile]);
 
@@ -157,6 +162,7 @@ function ProfileContent() {
           email: newStaffEmail,
           role: newStaffRole,
           password: newStaffPassword,
+          license_number: licenseNumber || null,
         }),
       });
 
@@ -174,7 +180,7 @@ function ProfileContent() {
 
       setNewStaffName("");
       setNewStaffEmail("");
-      setNewStaffPassword("password123");
+      setNewStaffPassword("");
 
       loadAllUsers();
     } catch (err: unknown) {
@@ -635,6 +641,14 @@ function ProfileContent() {
                   </select>
                 </div>
 
+                <div>
+                  <label htmlFor="staff-password" className="block text-xs font-semibold mb-1">Temporary password</label>
+                  <input id="staff-password" type="password" required minLength={6} autoComplete="new-password" value={newStaffPassword} onChange={e => setNewStaffPassword(e.target.value)} className="w-full rounded-xl border px-3 py-2" />
+                </div>
+                {(newStaffRole === "DRIVER" || newStaffRole === "ASSISTANT") && <div>
+                  <label htmlFor="staff-license" className="block text-xs font-semibold mb-1">License / staff reference</label>
+                  <input id="staff-license" required maxLength={100} value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} className="w-full rounded-xl border px-3 py-2" />
+                </div>}
                 <div>
                   <button
                     type="submit"
