@@ -234,12 +234,12 @@ export function AlertsSidebar({
                     </div>
                     <div>
                       <h2 className="text-base font-bold text-slate-900 leading-tight">
-                        Logistics Alerts & History
+                        {userRole === "CUSTOMER" ? "Notifications" : "Operations & Dispatch Alerts"}
                       </h2>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="text-[11px] font-medium text-emerald-700">
-                          {userRole ? `${userRole.replace("_", " ")} Feed` : "100% Real Database Feed"}
+                          {userRole === "CUSTOMER" ? "Live Updates" : `${(userRole || "Operations").replace("_", " ")} Feed`}
                         </span>
                       </div>
                     </div>
@@ -259,11 +259,10 @@ export function AlertsSidebar({
                   <button
                     type="button"
                     onClick={() => setActiveTab("unread")}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
-                      activeTab === "unread"
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg transition-all cursor-pointer ${activeTab === "unread"
                         ? "bg-white text-emerald-800 shadow-xs font-bold"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     <span>Live / Unread</span>
                     {unreadCount > 0 ? (
@@ -280,11 +279,10 @@ export function AlertsSidebar({
                   <button
                     type="button"
                     onClick={() => setActiveTab("history")}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
-                      activeTab === "history"
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg transition-all cursor-pointer ${activeTab === "history"
                         ? "bg-white text-emerald-800 shadow-xs font-bold"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     <span>Alert History</span>
                     <span className="flex items-center justify-center px-1.5 py-0.2 text-[10px] font-semibold rounded-full bg-slate-200 text-slate-700">
@@ -331,11 +329,10 @@ export function AlertsSidebar({
                           key={filter}
                           type="button"
                           onClick={() => setHistoryFilter(filter)}
-                          className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize cursor-pointer transition-colors ${
-                            historyFilter === filter
+                          className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize cursor-pointer transition-colors ${historyFilter === filter
                               ? "bg-emerald-100 text-emerald-800 font-bold"
                               : "text-slate-500 hover:bg-slate-200"
-                          }`}
+                            }`}
                         >
                           {filter}
                         </button>
@@ -357,7 +354,7 @@ export function AlertsSidebar({
                       Logistics dispatch alerts and order histories are protected and only accessible to authorized accounts.
                     </p>
                     <Link
-                      href="/login?redirect=/orders"
+                      href="/?redirect=/orders"
                       className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
                     >
                       <span>Sign In to Access Alerts</span>
@@ -378,7 +375,9 @@ export function AlertsSidebar({
                       </div>
                       <h3 className="text-sm font-bold text-slate-800">All Caught Up!</h3>
                       <p className="text-xs text-slate-500 mt-1 max-w-[240px]">
-                        No unread logistics alerts at the moment. All real consignment orders have been acknowledged.
+                        {userRole === "CUSTOMER"
+                          ? "No unread notifications at the moment. All consignment updates are up to date."
+                          : "No unread operational alerts at this moment."}
                       </p>
                       <button
                         type="button"
@@ -461,20 +460,18 @@ export function AlertsSidebar({
                       return (
                         <div
                           key={notif.id}
-                          className={`rounded-xl border p-3.5 transition-all text-xs ${
-                            isRead
+                          className={`rounded-xl border p-3.5 transition-all text-xs ${isRead
                               ? "border-slate-200 bg-white hover:border-slate-300"
                               : "border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-1.5">
                               <span
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                  isRead
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isRead
                                     ? "bg-slate-100 text-slate-600"
                                     : "bg-emerald-200 text-emerald-900"
-                                }`}
+                                  }`}
                               >
                                 {isRead ? "Read" : "Unread"}
                               </span>
@@ -534,9 +531,9 @@ export function AlertsSidebar({
 
               {/* Footer */}
               <div className="p-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-[11px] text-slate-500">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 text-emerald-700 font-medium">
                   <CheckCheck className="h-3 w-3 text-emerald-600" />
-                  MySQL Persistent Alerts
+                  Live Sync Active
                 </span>
                 <button
                   type="button"
@@ -571,8 +568,8 @@ export function NotificationBellButton({
       type="button"
       onClick={onClick}
       className="relative p-2 rounded-xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/50 text-slate-700 hover:text-emerald-800 transition-all cursor-pointer shadow-2xs"
-      aria-label="Open Logistics Alerts"
-      title="View Logistics Alerts & History"
+      aria-label="Open Notifications"
+      title="View Notifications"
     >
       <Bell className="h-4 w-4" />
       {unreadCount > 0 && (

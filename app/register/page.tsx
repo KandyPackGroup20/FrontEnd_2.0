@@ -308,7 +308,7 @@ export default function RegisterPage() {
         <div className="mt-6 text-center text-xs text-white/70">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href="/"
             className="font-semibold text-green-300 hover:text-green-200 transition-colors underline underline-offset-4"
           >
             Sign in

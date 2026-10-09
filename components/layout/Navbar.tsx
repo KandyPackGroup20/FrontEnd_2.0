@@ -63,11 +63,10 @@ export default function Navbar() {
   return (
     <>
       <motion.header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
             ? "glass border-b border-white/20"
             : "bg-transparent"
-        }`}
+          }`}
         style={{ borderRadius: scrolled ? 0 : 0 }}
         initial={{ y: -100 }}
         animate={{ y: 0 }}
@@ -128,7 +127,7 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Button variant="secondary" size="sm" href="/login" id="nav-sign-in">
+                <Button variant="secondary" size="sm" href="/" id="nav-sign-in">
                   Sign in
                 </Button>
                 <Button variant="primary" size="sm" href="/register" id="nav-get-started">
@@ -196,7 +195,7 @@ export default function Navbar() {
                 </Button>
               ) : (
                 <>
-                  <Button variant="secondary" href="/login" id="nav-mobile-sign-in">
+                  <Button variant="secondary" href="/" id="nav-mobile-sign-in">
                     Sign in
                   </Button>
                   <Button variant="primary" href="/register" id="nav-mobile-get-started">

@@ -396,38 +396,24 @@ export default function NewOrderPage() {
               </div>
 
               <h2 className="text-2xl font-black text-text-heading mb-1 tracking-tight">
-                Consignment Order Placed!
+                Consignment Booked Successfully!
               </h2>
               <p className="text-text-muted text-sm mb-6">
-                Your freight order has been registered in the Kandypack database and queued for rail allocation.
+                Your freight order has been registered and scheduled for rail allocation and delivery.
               </p>
 
-              {/* Automated Logistics Manager Alert Banner */}
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-300 p-4 mb-6 text-left flex items-start gap-3 shadow-xs">
-                <Bell className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+              {/* Order Confirmation Notice */}
+              <div className="rounded-2xl bg-emerald-50/80 border border-emerald-200/90 p-4 mb-6 text-left flex items-start gap-3 shadow-2xs">
+                <div className="h-9 w-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
-                      Logistics Manager Notified Automatically
-                    </span>
-                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                    Booking Confirmed & Queued
                   </div>
                   <div className="text-xs text-emerald-800 mt-1 leading-relaxed">
-                    Automated email and dispatch alert successfully queued to{" "}
-                    <strong>logistics@kandypack.lk</strong> (Kimal Logistics Mgr). Staff can now schedule
-                    rail freight wagons from Kandy Central Goods Yard.
+                    A confirmation receipt has been sent to your contact details. Our team is scheduling your cargo onto the upcoming scheduled train departure.
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSidebarTab("unread");
-                      setSidebarOpen(true);
-                    }}
-                    className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition-colors cursor-pointer"
-                  >
-                    <Bell className="h-3 w-3" />
-                    <span>View Real Alert in Sidebar Drawer →</span>
-                  </button>
                 </div>
               </div>
 
@@ -945,10 +931,9 @@ export default function NewOrderPage() {
                     </div>
 
                     <div className="mt-3 pt-3 border-t border-green-200/60 text-xs text-green-800 flex items-center gap-2">
-                      <Bell className="h-4 w-4 text-green-600 shrink-0" />
+                      <Train className="h-4 w-4 text-green-600 shrink-0" />
                       <span>
-                        Upon confirming, an automated dispatch notification will be transmitted directly to{" "}
-                        <strong>logistics@kandypack.lk</strong> for rail scheduling.
+                        Upon confirming, your cargo reservation will be queued immediately for railway freight dispatch.
                       </span>
                     </div>
                   </div>

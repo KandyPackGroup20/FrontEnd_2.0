@@ -4,10 +4,9 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, ArrowRight, Train, Loader2, AlertCircle } from "lucide-react";
 import { setAuthToken } from "@/lib/api";
 
-function LoginForm() {
+function Form() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams.get("redirect") || "/orders";
@@ -125,7 +124,7 @@ function LoginForm() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <p className="font-semibold text-green-300 text-lg">Login successful!</p>
+            <p className="font-semibold text-green-300 text-lg"> successful!</p>
             <p className="mt-1 text-sm text-green-100/80">Redirecting to your dashboard...</p>
           </motion.div>
         ) : (
@@ -144,14 +143,14 @@ function LoginForm() {
             {/* Email */}
             <div>
               <label
-                htmlFor="login-email"
+                htmlFor="-email"
                 className="block mb-1 text-xs font-semibold uppercase tracking-wider text-green-100/90"
               >
                 Email address
               </label>
               <div className="relative">
                 <input
-                  id="login-email"
+                  id="-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -168,7 +167,7 @@ function LoginForm() {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label
-                  htmlFor="login-password"
+                  htmlFor="-password"
                   className="block text-xs font-semibold uppercase tracking-wider text-green-100/90"
                 >
                   Password
@@ -176,7 +175,7 @@ function LoginForm() {
               </div>
               <div className="relative">
                 <input
-                  id="login-password"
+                  id="-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -191,7 +190,7 @@ function LoginForm() {
 
             {/* Submit Button */}
             <button
-              id="login-submit-btn"
+              id="-submit-btn"
               type="submit"
               disabled={loading}
               className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.98] text-white font-semibold py-3 px-4 shadow-lg shadow-green-900/40 transition-all cursor-pointer disabled:opacity-50"
@@ -225,10 +224,10 @@ function LoginForm() {
   );
 }
 
-export default function LoginPage() {
+export default function Page() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
-      <LoginForm />
+      <Form />
     </Suspense>
   );
 }

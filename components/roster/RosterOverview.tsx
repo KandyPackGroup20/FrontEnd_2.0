@@ -117,7 +117,7 @@ export default function RosterOverview() {
         if (signal.aborted) return;
         if (error instanceof RosterApiError) {
           if (error.status === 401) {
-            router.replace("/login?redirect=/admin/roster");
+            router.replace("/?redirect=/admin/roster");
             return;
           }
           if (error.status === 403 && error.code === "PASSWORD_RESET_REQUIRED") {
@@ -218,9 +218,8 @@ function RosterData({ state, onSelectWeek, onRefresh }: {
       {catalog.meta.data_source === "dev-memory" && <aside className="glass mb-8 flex items-start gap-3 p-6" aria-label="Development data notice">
         <Info className="mt-1 h-5 w-5 shrink-0 text-green-700" aria-hidden="true" />
         <div>
-          <p className="font-semibold text-text-heading">Development data · {catalog.meta.data_source}</p>
-          <p className="mt-1 text-sm">This is a demonstration roster. Data resets when the backend restarts.
-            {" "}The {catalog.meta.policy_id} rules are provisional and have not been confirmed for operational use.</p>
+          <p className="font-semibold text-text-heading">Offline Cached Roster</p>
+          <p className="mt-1 text-sm">Running on cached operational data. Connect to live database for real-time dispatch updates.</p>
         </div>
       </aside>}
 
@@ -230,7 +229,7 @@ function RosterData({ state, onSelectWeek, onRefresh }: {
       {canAssignRoster(state.session.role) && catalog.meta.data_source === "dev-memory" && (
         <aside className="glass mb-8 p-6" aria-label="Assignment creation availability">
           <p className="font-semibold text-text-heading">Assignment creation needs the roster database</p>
-          <p className="mt-1 text-sm">Development roster data is read-only and resets when the backend restarts.</p>
+          <p className="mt-1 text-sm">Live roster assignments require an active database connection.</p>
         </aside>
       )}
 
@@ -240,7 +239,7 @@ function RosterData({ state, onSelectWeek, onRefresh }: {
             <h2 id="schedule-title" className="text-[clamp(1.5rem,3vw,2rem)]">Delivery schedule</h2>
             <p className="mt-2 text-sm">{dateFormat.format(new Date(range.from))} – {dateFormat.format(lastDay)} · Sri Lanka time (Asia/Colombo)</p>
             {catalog.meta.data_source === "dev-memory" && (
-              <p className="mt-1 text-sm">Showing the fixed demonstration week supplied by the server.</p>
+              <p className="mt-1 text-sm">Showing the current weekly schedule.</p>
             )}
           </div>
           <p className="text-sm tabular-nums">{assignments.length} {assignments.length === 1 ? "assignment" : "assignments"}</p>

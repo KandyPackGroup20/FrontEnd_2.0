@@ -131,7 +131,7 @@ FrontEnd_2.0/
 │   ├── page.tsx               # Landing page
 │   ├── layout.tsx             # Root layout
 │   ├── globals.css            # Global styles + Tailwind layer
-│   ├── login/                 # Auth screens
+│   ├── /                 # Auth screens
 │   ├── register/
 │   ├── order/                 # Multi-step order flow
 │   ├── orders/                # Order history + live tracking
