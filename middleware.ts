@@ -55,6 +55,13 @@ export function middleware(request: NextRequest) {
         { status: 403, headers: { 'content-type': 'application/json' } }
       );
     }
+    // 4.2: rail capacity management is restricted to LOGISTICS_MGR and SUPERADMIN
+    if (pathname.startsWith('/admin/rail') && !['LOGISTICS_MGR', 'SUPERADMIN'].includes(session?.role ?? '')) {
+      return new NextResponse(
+        JSON.stringify({ error: 'FORBIDDEN_ROLE', message: 'Only Logistics Managers and Superadmins can access rail capacity management.' }),
+        { status: 403, headers: { 'content-type': 'application/json' } }
+      );
+    }
   }
 
   // 2. Protected customer routes that require an authenticated session

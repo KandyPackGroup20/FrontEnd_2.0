@@ -58,6 +58,9 @@ export default function Navbar() {
     { label: "Coverage", href: "#coverage" },
     { label: "Track Order", href: "/orders" },
     { label: "Warehouse", href: "/warehouse" },
+    ...(currentUser && ["LOGISTICS_MGR", "SUPERADMIN"].includes(currentUser.role)
+      ? [{ label: "Rail Management", href: "/admin/rail" }]
+      : []),
   ];
 
   return (
