@@ -223,7 +223,18 @@ export default function WarehousePage() {
           role: "STORE_MGR" | "WAREHOUSE_STAFF" | string;
         }>("/auth/me");
 
+        let initialStationId = stationId;
+        const emailLower = (user.email || "").toLowerCase();
+        if (emailLower.includes("galle")) initialStationId = 3;
+        else if (emailLower.includes("colombo")) initialStationId = 1;
+        else if (emailLower.includes("negombo")) initialStationId = 2;
+        else if (emailLower.includes("matara")) initialStationId = 4;
+        else if (emailLower.includes("jaffna")) initialStationId = 5;
+        else if (emailLower.includes("trinco")) initialStationId = 6;
+        else if (emailLower.includes("kandy")) initialStationId = 7;
+
         if (!cancelled) {
+          setStationId(initialStationId);
           setOperator({
             name: user.name,
             role: user.role === "WAREHOUSE_STAFF" ? "WAREHOUSE_STAFF" : "STORE_MGR",
@@ -231,7 +242,7 @@ export default function WarehousePage() {
           });
         }
 
-        await fetchStationData(stationId);
+        await fetchStationData(initialStationId);
         if (!cancelled) setBanner(null);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -326,7 +337,7 @@ export default function WarehousePage() {
       });
       setBanner({
         type: "success",
-        text: `Trip #${tripId} received. Station stock has been updated.`,
+        text: `Train manifest for Trip #${tripId} confirmed received! Station stock updated and allocated customer orders marked as ARRIVED AT STATION STORE.`,
       });
       await reloadStation();
     } catch (err) {

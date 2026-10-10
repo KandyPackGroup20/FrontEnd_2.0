@@ -1483,10 +1483,20 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
               <div className="overflow-y-auto flex-1 space-y-3 pr-1">
                 {suitableTripsList.length === 0 ? (
-                  <div className="py-12 text-center text-slate-500">
-                    <AlertCircle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-800">No suitable train trips available</p>
-                    <p className="text-xs mt-1">There are no scheduled trips departing Kandy towards this destination before the delivery cutoff date.</p>
+                  <div className="py-10 text-center text-slate-500">
+                    <AlertCircle className="h-9 w-9 text-amber-500 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-900 text-sm">No suitable train trips available</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      There are no scheduled trips departing Kandy towards <strong>{selectedOrderForSuitable.destination_city} Hub</strong> before the delivery cutoff date (<strong>{selectedOrderForSuitable.delivery_date}</strong>).
+                    </p>
+                    <div className="mt-4 inline-block bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900 text-left max-w-lg shadow-xs">
+                      <div className="font-bold flex items-center gap-1.5 mb-1 text-amber-800">
+                        <span>💡 How to enable scheduling for this order:</span>
+                      </div>
+                      <p className="leading-relaxed text-[11px] text-amber-700">
+                        Click <strong>&quot;+ Create Scheduled Trip&quot;</strong> on the main rail page and add a new trip to <strong>{selectedOrderForSuitable.destination_city} Hub</strong> with arrival date strictly on or before <strong>{selectedOrderForSuitable.delivery_date}</strong>.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   suitableTripsList.map((st) => {
@@ -1577,12 +1587,21 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
 
                   <button
                     onClick={() => {
+                      if (suitableTripsList.length === 0) return;
                       setSuitableDrawerOpen(false);
                       handleAllocate(selectedOrderForSuitable.order_id, null);
                     }}
                     disabled={suitableTripsList.length === 0 || loading}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold shadow-md shadow-green-600/20 cursor-pointer"
-                    title="Auto-spill across consecutive trains chronologically"
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      suitableTripsList.length === 0 || loading
+                        ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none"
+                        : "bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-600/20 cursor-pointer"
+                    }`}
+                    title={
+                      suitableTripsList.length === 0
+                        ? "No suitable train trips available before order delivery cutoff date"
+                        : "Auto-spill across consecutive trains chronologically"
+                    }
                   >
                     <Split className="h-3.5 w-3.5" />
                     <span>Auto Multi-Trip Spillover</span>
