@@ -3,102 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type ReportRow = Record<string, any>;
+import ReportTable from "@/components/ReportTable";
+import { colomboMonday, ReportRow, reportRows } from "@/lib/reports";
 
-type Column = {
-  key: string;
-  label: string;
-};
-
-function ReportTable({
-  title,
-  rows,
-  columns,
-}: {
-  title: string;
-  rows: ReportRow[];
-  columns: Column[];
-}) {
-  return (
-    <section className="overflow-hidden rounded-[28px] border border-emerald-100/70 bg-white/75 shadow-[0_10px_30px_rgba(16,185,129,0.06)] backdrop-blur-xl">
-      <div className="border-b border-emerald-100/60 bg-gradient-to-r from-emerald-50/80 via-white/90 to-white/70 px-6 py-5 md:px-8">
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900 md:text-2xl">
-          {title}
-        </h2>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="m-6 rounded-2xl border border-emerald-100/60 bg-emerald-50/40 p-5 text-sm text-slate-500">
-          No report data available.
-        </div>
-      ) : (
-        <div className="overflow-x-auto p-5 md:p-6">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-emerald-100/70 bg-emerald-50/55">
-                {columns.map((column) => (
-                  <th
-                    key={column.key}
-                    className="px-4 py-3.5 text-left text-sm font-semibold text-emerald-900"
-                  >
-                    {column.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.map((row, index) => (
-                <tr
-                  key={index}
-                  className="border-b border-slate-100/80 transition-colors hover:bg-emerald-50/35"
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className="px-4 py-4 text-slate-700"
-                    >
-                      {row[column.key] ?? "-"}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function getFirstArray(data: any): ReportRow[] {
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  if (data && typeof data === "object") {
-    for (const value of Object.values(data)) {
-      if (Array.isArray(value)) {
-        return value as ReportRow[];
-      }
-    }
-  }
-
-  return [];
-}
-
-async function loadReport(url: string) {
+async function loadReport(url: string, key: string, signal: AbortSignal) {
   const response = await fetch(url, {
     credentials: "include",
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to load ${url}`);
+    throw new Error(`Report request failed (${response.status}). Retry or check report availability.`);
   }
 
   const data = await response.json();
-  return getFirstArray(data);
+  return reportRows(data, key);
 }
 
 export default function ReportsPage() {
@@ -116,7 +36,11 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [week, setWeek] = useState(() => colomboMonday());
+  const [refresh, setRefresh] = useState(0);
+
   useEffect(() => {
+    const controller = new AbortController();
     async function checkAccessAndLoadReports() {
       try {
         setLoading(true);
@@ -126,10 +50,15 @@ export default function ReportsPage() {
         const authResponse = await fetch("/api/v1/auth/me", {
           credentials: "include",
           cache: "no-store",
+          signal: controller.signal,
         });
 
         // Not logged in
         if (!authResponse.ok) {
+          if (authResponse.status !== 401 && authResponse.status !== 403) {
+            throw new Error("Account verification is unavailable. Please retry.");
+          }
+          setAuthorized(false);
           router.replace("/login?redirect=/admin/reports");
           return;
         }
@@ -138,6 +67,7 @@ export default function ReportsPage() {
 
         // Only SUPERADMIN can view management reports
         if (user.role !== "SUPERADMIN") {
+          setAuthorized(false);
           router.replace("/profile");
           return;
         }
@@ -153,14 +83,15 @@ export default function ReportsPage() {
           truckUtilisationData,
           stationInventoryData,
         ] = await Promise.all([
-          loadReport("/api/v1/reports/quarterly-sales"),
-          loadReport("/api/v1/reports/top-products"),
-          loadReport("/api/v1/reports/rail-capacity-utilisation"),
-          loadReport("/api/v1/reports/workforce-hours"),
-          loadReport("/api/v1/reports/truck-utilisation"),
-          loadReport("/api/v1/reports/station-inventory"),
+          loadReport("/api/v1/reports/quarterly-sales", "quarterly_sales", controller.signal),
+          loadReport("/api/v1/reports/top-products", "top_products", controller.signal),
+          loadReport("/api/v1/reports/rail-capacity-utilisation", "rail_capacity_utilisation", controller.signal),
+          loadReport(`/api/v1/reports/workforce-hours?week_start=${week}`, "workforce_hours", controller.signal),
+          loadReport("/api/v1/reports/truck-utilisation", "truck_utilisation", controller.signal),
+          loadReport("/api/v1/reports/station-inventory", "station_inventory", controller.signal),
         ]);
 
+        if (controller.signal.aborted) return;
         setQuarterlySales(quarterlySalesData);
         setTopProducts(topProductsData);
         setRailCapacity(railCapacityData);
@@ -168,18 +99,19 @@ export default function ReportsPage() {
         setTruckUtilisation(truckUtilisationData);
         setStationInventory(stationInventoryData);
       } catch (err) {
-        console.error(err);
+        if (controller.signal.aborted) return;
 
         setError(
-          "Unable to load the management reports. Please make sure the backend is running."
+          err instanceof Error ? err.message : "Unable to load management reports."
         );
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     checkAccessAndLoadReports();
-  }, [router]);
+    return () => controller.abort();
+  }, [router, week, refresh]);
 
   if (!authorized && loading) {
     return (
@@ -196,7 +128,7 @@ export default function ReportsPage() {
   }
 
   if (!authorized) {
-    return null;
+    return <main className="p-8" role="alert">{error || "Redirecting to sign in..."}<button className="ml-4" onClick={() => setRefresh(value => value + 1)}>Retry</button></main>;
   }
 
   return (
@@ -221,18 +153,27 @@ export default function ReportsPage() {
           </p>
         </div>
 
+        <div className="mb-6 flex flex-wrap items-center gap-4">
+          <label htmlFor="report-week">Workforce week (Colombo Monday)</label>
+          <input id="report-week" type="date" value={week} className="rounded border p-2" onChange={event => { if (event.target.value) setWeek(colomboMonday(new Date(`${event.target.value}T12:00:00+05:30`))); }} />
+          <button type="button" disabled={loading} className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-50" onClick={() => setRefresh(value => value + 1)}>Refresh reports</button>
+        </div>
+        <p className="mb-5 text-sm text-slate-600">Sales show booked goods value excluding cancelled orders. Truck and workforce hours include scheduled, in-transit and completed duties. Stock is current; receipts and adjustments are lifetime movements.</p>
+        {loading && <p role="status" className="mb-5">Loading reports...</p>}
         {error && (
           <div className="mb-8 rounded-2xl border border-red-200/70 bg-white/80 p-4 text-red-600 shadow-sm backdrop-blur-lg">
             {error}
           </div>
         )}
 
-        {!loading && (
+        {!loading && !error && (
           <div className="space-y-10">
             <ReportTable
               title="1. Quarterly Sales by Route and Product"
               rows={quarterlySales}
+              metric="total_sales" metricLabel="Booked sales (LKR)"
               columns={[
+                { key: "row_level", label: "Row type" },
                 { key: "sales_year", label: "Year" },
                 { key: "sales_quarter", label: "Quarter" },
                 { key: "route_name", label: "Route" },
@@ -245,6 +186,7 @@ export default function ReportsPage() {
             <ReportTable
               title="2. Top-Selling Products per Quarter"
               rows={topProducts}
+              metric="total_quantity" metricLabel="Units ordered"
               columns={[
                 { key: "sales_year", label: "Year" },
                 { key: "sales_quarter", label: "Quarter" },
@@ -258,7 +200,9 @@ export default function ReportsPage() {
             <ReportTable
               title="3. Rail Capacity Utilisation by Station and Month"
               rows={railCapacity}
+              metric="utilization_percentage" metricLabel="Rail utilisation (%)"
               columns={[
+                { key: "row_level", label: "Row type" },
                 { key: "destination_hub", label: "Station" },
                 { key: "dep_year", label: "Year" },
                 { key: "dep_month", label: "Month" },
@@ -272,12 +216,14 @@ export default function ReportsPage() {
             <ReportTable
               title="4. Workforce Hours vs 40h/60h Cap"
               rows={workforceHours}
+              metric="accumulated_hours" metricLabel="Scheduled hours"
               columns={[
                 { key: "delivery_staff_id", label: "Staff ID" },
                 { key: "staff_name", label: "Staff Member" },
                 { key: "staff_role", label: "Role" },
                 { key: "accumulated_hours", label: "Work Hours" },
                 { key: "weekly_cap", label: "Hour Cap" },
+                { key: "remaining_hours", label: "Remaining hours" },
                 { key: "utilization_pct", label: "Utilisation %" },
                 { key: "status_flag", label: "Status" },
               ]}
@@ -286,7 +232,11 @@ export default function ReportsPage() {
             <ReportTable
               title="5. Truck Utilisation"
               rows={truckUtilisation}
+              metric="total_operating_hours" metricLabel="Operating hours"
               columns={[
+                { key: "row_level", label: "Row type" },
+                { key: "usage_year", label: "Year" },
+                { key: "usage_month", label: "Month" },
                 { key: "truck_id", label: "Truck ID" },
                 { key: "plate_number", label: "Plate Number" },
                 { key: "total_delivery_runs", label: "Delivery Runs" },
@@ -301,10 +251,13 @@ export default function ReportsPage() {
             <ReportTable
               title="6. Station Inventory & Stock Adjustment Summary"
               rows={stationInventory}
+              metric="stored_quantity" metricLabel="Current units"
               columns={[
                 { key: "station", label: "Station" },
                 { key: "product_name", label: "Product" },
-                { key: "stored_quantity", label: "Stored Quantity" },
+                { key: "location_code", label: "Bin" },
+                { key: "received_quantity", label: "Received units" },
+                { key: "stored_quantity", label: "Current stock" },
                 {
                   key: "positive_adjustments",
                   label: "Positive Adjustments",
@@ -314,7 +267,8 @@ export default function ReportsPage() {
                   label: "Negative Adjustments",
                 },
                 { key: "net_adjustment", label: "Net Adjustment" },
-                { key: "adjusted_stock", label: "Adjusted Stock" },
+                { key: "damaged_quantity", label: "Damaged units" },
+                { key: "net_receipts", label: "Receipts + adjustments" },
               ]}
             />
           </div>
