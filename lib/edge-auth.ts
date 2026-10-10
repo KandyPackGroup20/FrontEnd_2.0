@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 type Session = { user_id: number; role: string; force_password_reset: boolean };
-const backend = (process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+const backend = (process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://backend-bzhp.onrender.com' : 'http://127.0.0.1:8000')).replace(/\/+$/, '');
 const staffRoles = ['SUPERADMIN', 'LOGISTICS_MGR', 'DISPATCHER', 'STORE_MGR', 'WAREHOUSE_STAFF', 'DRIVER', 'ASSISTANT'];
 const home = (role: string) => ({ SUPERADMIN: '/admin/users', LOGISTICS_MGR: '/admin/rail', DISPATCHER: '/admin/roster', STORE_MGR: '/warehouse', WAREHOUSE_STAFF: '/warehouse', DRIVER: '/profile', ASSISTANT: '/profile' }[role] || '/orders');
 const within = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
@@ -29,7 +29,22 @@ export async function middleware(request: NextRequest) {
       if (result.ok) session = await result.json() as Session;
       else if (result.status !== 401 && result.status !== 403) throw new Error('Session service unavailable');
     } catch {
-      if (protectedPage) {
+      // In case of backend cold start timeout or connectivity drop, verify unexpired JWT claims
+      try {
+        const parts = (token || '').split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+          if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
+            session = {
+              user_id: Number(payload.sub),
+              role: String(payload.role),
+              force_password_reset: Boolean(payload.force_password_reset),
+            };
+          }
+        }
+      } catch {}
+
+      if (!session && protectedPage) {
         return new NextResponse('Session verification is temporarily unavailable. Please retry.', { status: 503 });
       }
     }

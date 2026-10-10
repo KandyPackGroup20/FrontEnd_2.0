@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const rawBackendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+const rawBackendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://backend-bzhp.onrender.com' : 'http://127.0.0.1:8000');
 const backendUrl = rawBackendUrl.replace(/\/+$/, '');
 
 const nextConfig: NextConfig = {
