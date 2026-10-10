@@ -523,8 +523,17 @@ test("weekly hours render populated and zero weeks, loading, errors and empty re
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   });
   const require = createRequire(import.meta.url);
+  const modules = {};
+  for (const [name, path] of [["@/lib/roster/fatigue", "../lib/roster/fatigue.ts"], ["./FatigueBadge", "../components/roster/FatigueBadge.tsx"]]) {
+    const code = ts.transpileModule(await readFile(new URL(path, import.meta.url), "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText;
+    const loaded = {};
+    new Function("require", "exports", code)((id) => modules[id] ?? require(id), loaded);
+    modules[name] = loaded;
+  }
   const exports = {};
-  new Function("require", "exports", compiled.outputText)(require, exports);
+  new Function("require", "exports", compiled.outputText)((id) => modules[id] ?? require(id), exports);
   const { createElement } = require("react");
   const { renderToStaticMarkup } = require("react-dom/server");
   const render = (state) => renderToStaticMarkup(createElement(exports.default, { state, staff: [] }));
@@ -542,6 +551,12 @@ test("weekly hours render populated and zero weeks, loading, errors and empty re
   } });
   assert.equal((zero.match(/>0 h</g) ?? []).length, 2);
   assert.match(zero, /Driver Kasun/);
+  for (const [ratio, color] of [[0.89, "green"], [0.9, "yellow"], [1, "yellow"], [1.01, "red"]]) {
+    const html = render({ kind: "ready", data: { ...populated, hours: populated.hours.map((row) => ({
+      ...row, scheduled_seconds: row.limit_seconds * ratio, remaining_seconds: row.limit_seconds * (1-ratio),
+    })) } });
+    assert.match(html, new RegExp(`bg-${color}-100`));
+  }
   assert.match(render({ kind: "loading" }), /Loading weekly hours/);
   const failure = render({ kind: "error", message: "Permission denied" });
   assert.match(failure, /role="alert"/);
@@ -644,4 +659,49 @@ test('loading-list order details render saved destinations, products, quantities
   const { renderToStaticMarkup } = require('react-dom/server');
   const html = renderToStaticMarkup(createElement(componentModule.exports.OrderDetails, { order: { ...cargoOrder, eligible: false, blocked_reasons: ['ORDER_NOT_FULLY_RECEIVED'] } }));
   for (const text of ['Saved recipient', 'Saved street', 'Tea crate', '>4<', 'All ordered goods must be received']) assert.ok(html.includes(text), text);
+});
+
+test('start delivery posts separately and accepts replay without attaching orders', async () => {
+  const request = mock.method(globalThis, 'fetch', async () => jsonResponse({ status: 'SUCCESS', result_code: 'DELIVERY_ALREADY_STARTED', roster_id: 42 }));
+  await api.startDelivery(42);
+  const [path, options] = request.mock.calls[0].arguments;
+  assert.equal(path, '/api/v1/roster/schedules/42/start');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.credentials, 'same-origin');
+  assert.equal(options.cache, 'no-store');
+  assert.deepEqual(JSON.parse(options.body), {});
+  request.mock.mockImplementation(async () => jsonResponse({ detail: { error_code: 'RUN_EMPTY', message: 'Attach whole orders first.' } }, 409));
+  await assert.rejects(api.startDelivery(42), { code: 'RUN_EMPTY', status: 409 });
+  assert.equal(request.mock.calls.length, 2);
+});
+
+test('availability carries interval and selected counterpart and preserves all week projections', async () => {
+  const week = { week_start: '2026-09-14', scheduled_seconds: 140400, proposed_seconds: 3600,
+    projected_seconds: 144000, limit_seconds: 144000, remaining_seconds: 0 };
+  const body = { timezone: 'Asia/Colombo', drivers: [{ staff_id: 1, name: 'Driver', staff_type: 'DRIVER',
+    weeks: [week, { ...week, week_start: '2026-09-21' }] }], assistants: [], excluded: [{ staff_id: 2, message: 'Inactive' }] };
+  const request = mock.method(globalThis, 'fetch', async () => jsonResponse(body));
+  const params = { route_id: '1', truck_id: '2', assistant_id: '3', from: '2026-09-20T23:00:00+05:30', to: '2026-09-21T01:00:00+05:30' };
+  assert.deepEqual(await api.getCrewAvailability(params, signal()), body);
+  const [path, options] = request.mock.calls[0].arguments;
+  assert.deepEqual(Object.fromEntries(new URL(path, 'http://localhost').searchParams), params);
+  assert.equal(options.credentials, 'same-origin');
+  assert.equal(options.cache, 'no-store');
+  request.mock.mockImplementation(async () => jsonResponse({ ...body, drivers: [{ ...body.drivers[0], staff_type: 'ASSISTANT' }] }));
+  await assert.rejects(api.getCrewAvailability(params, signal()), { code: 'INVALID_RESPONSE' });
+});
+
+test('Next rewrite forwards both phase-three endpoints and middleware leaves APIs to backend authentication', async () => {
+  const source = await readFile(new URL('../next.config.ts', import.meta.url), 'utf8');
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } });
+  const exports = {};
+  new Function('exports', compiled.outputText)(exports);
+  const rules = await exports.default.rewrites();
+  const rule = rules.find((r) => r.source === '/api/v1/:path*');
+  assert.ok(rule);
+  for (const suffix of ['roster/availability', 'roster/schedules/42/start']) {
+    assert.ok(rule.destination.replace(':path*', suffix).endsWith(`/api/v1/${suffix}`));
+  }
+  const middleware = await readFile(new URL('../middleware.ts', import.meta.url), 'utf8');
+  assert.match(middleware, /\(\?!api\//);
 });

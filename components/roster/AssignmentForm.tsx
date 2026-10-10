@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, ReactNode, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
 import { createRosterAssignment, RosterApiError, serializeColomboDateTime } from "@/lib/roster/api";
 import type { CargoOrder, RosterCandidates, StationStore } from "@/lib/roster/types";
+import { getCrewAvailability, type CrewAvailability, type EligibleCrew } from "@/lib/roster/api";
+import FatigueBadge from "./FatigueBadge";
 
 interface AssignmentFormProps {
   catalog: RosterCandidates;
@@ -28,6 +30,45 @@ export default function AssignmentForm({ catalog, onCreated, stores, stationId, 
   const [endTime, setEndTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [crew, setCrew] = useState<{ key: string; data: CrewAvailability } | null>(null);
+  const [crewError, setCrewError] = useState<{ key: string; message: string } | null>(null);
+  const [crewRefresh, setCrewRefresh] = useState(0);
+  const crewKey = JSON.stringify([routeId, truckId, startTime, endTime, driverId, assistantId, crewRefresh]);
+  const available = crew?.key === crewKey ? crew.data : null;
+  const crewMessage = !routeId || !truckId || !startTime || !endTime
+    ? "Choose route, truck, and start/end times to check crew availability."
+    : crewError?.key === crewKey ? crewError.message
+    : !available ? "Checking crew availability…"
+    : "Availability is checked again when you create the schedule. Another dispatcher may assign crew meanwhile.";
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!routeId || !truckId || !startTime || !endTime) return () => controller.abort();
+    let params: Record<string, string>;
+    try {
+      params = { route_id: routeId, truck_id: truckId, from: serializeColomboDateTime(startTime), to: serializeColomboDateTime(endTime),
+        ...(driverId ? { driver_id: driverId } : {}), ...(assistantId ? { assistant_id: assistantId } : {}) };
+    } catch { return () => controller.abort(); }
+    getCrewAvailability(params, controller.signal).then((data) => {
+      if (controller.signal.aborted) return;
+      const cleared: string[] = [];
+      if (driverId && !data.drivers.some((s) => String(s.staff_id) === driverId)) {
+        setDriverId("");
+        cleared.push(`Driver cleared: ${data.excluded.find((s) => String(s.staff_id) === driverId)?.message ?? "No longer eligible for these scheduling inputs."}`);
+      }
+      if (assistantId && !data.assistants.some((s) => String(s.staff_id) === assistantId)) {
+        setAssistantId("");
+        cleared.push(`Assistant cleared: ${data.excluded.find((s) => String(s.staff_id) === assistantId)?.message ?? "No longer eligible for these scheduling inputs."}`);
+      }
+      if (cleared.length) setMessage(cleared.join(" "));
+      setCrew({ key: crewKey, data });
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) {
+        setCrew(null);
+        setCrewError({ key: crewKey, message: error instanceof Error ? error.message : "Crew availability unavailable." });
+      }
+    });
+    return () => controller.abort();
+  }, [routeId, truckId, startTime, endTime, driverId, assistantId, crewKey]);
   const requestKey = useRef<string | null>(null);
   const submittingRef = useRef(false);
   const selectedTruck = catalog.trucks.find((truck) => String(truck.truck_id) === truckId);
@@ -35,7 +76,7 @@ export default function AssignmentForm({ catalog, onCreated, stores, stationId, 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submittingRef.current) return;
+    if (submittingRef.current || !available) return;
     setMessage(null);
     try {
       const request = {
@@ -98,15 +139,15 @@ export default function AssignmentForm({ catalog, onCreated, stores, stationId, 
           </select>
         </Field>
         <Field label="Driver" id="roster-driver">
-          <select id="roster-driver" value={driverId} onChange={(event) => setDriverId(event.target.value)} disabled={submitting} required className="input">
+          <select id="roster-driver" value={driverId} onChange={(event) => setDriverId(event.target.value)} disabled={submitting || !available} required className="input">
             <option value="">Select driver</option>
-            {catalog.drivers.map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}</option>)}
+            {(available?.drivers ?? []).map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}</option>)}
           </select>
         </Field>
         <Field label="Assistant" id="roster-assistant">
-          <select id="roster-assistant" value={assistantId} onChange={(event) => setAssistantId(event.target.value)} disabled={submitting} required className="input">
+          <select id="roster-assistant" value={assistantId} onChange={(event) => setAssistantId(event.target.value)} disabled={submitting || !available} required className="input">
             <option value="">Select assistant</option>
-            {catalog.assistants.map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}</option>)}
+            {(available?.assistants ?? []).map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}</option>)}
           </select>
         </Field>
         <Field label="Start time — Sri Lanka time" id="roster-start-time">
@@ -116,8 +157,16 @@ export default function AssignmentForm({ catalog, onCreated, stores, stationId, 
           <input id="roster-end-time" type="datetime-local" step="60" value={endTime} onChange={(event) => setEndTime(event.target.value)} disabled={submitting} required className="input" />
         </Field>
 
+        <p role="status" className="md:col-span-2 text-sm">{crewMessage}</p>
+        <button type="button" className="btn-secondary px-4 py-2" disabled={submitting || !routeId || !truckId || !startTime || !endTime}
+          onClick={() => setCrewRefresh((value) => value + 1)}>Refresh crew availability</button>
+        {available && <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+          {[...available.drivers, ...available.assistants].map((person) => <CrewHours key={person.staff_id} person={person} />)}
+          {!available.drivers.length && <p>No eligible drivers for this interval and selected crew.</p>}
+          {!available.assistants.length && <p>No eligible assistants for this interval and selected crew.</p>}
+        </div>}
         <div className="md:col-span-2 flex flex-wrap items-center gap-4">
-          <button type="submit" disabled={submitting} className="btn-primary px-7 py-3 text-[0.9375rem] disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={submitting || !available} className="btn-primary px-7 py-3 text-[0.9375rem] disabled:cursor-not-allowed disabled:opacity-60">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
             {submitting ? "Creating truck schedule…" : "Create truck schedule"}
           </button>
@@ -126,6 +175,17 @@ export default function AssignmentForm({ catalog, onCreated, stores, stationId, 
       </form>
     </section>
   );
+}
+
+function CrewHours({ person }: { person: EligibleCrew }) {
+  const hours = (seconds: number) => Number((seconds / 3600).toFixed(2));
+  return <div className="rounded-xl border border-green-100 p-3 text-sm">
+    <strong>{person.name} · {person.staff_type === "DRIVER" ? "Driver" : "Assistant"}</strong>
+    {person.weeks.map((week) => <div className="mt-2" key={week.week_start}>
+      <p className="mb-2">Week of {week.week_start} <FatigueBadge seconds={week.projected_seconds} limit={week.limit_seconds} /></p>
+      <p>{hours(week.scheduled_seconds)} h scheduled + {hours(week.proposed_seconds)} h proposed / {hours(week.limit_seconds)} h limit · {hours(week.remaining_seconds)} h remaining after assignment</p>
+    </div>)}
+  </div>;
 }
 
 function Field({ label, id, children }: { label: string; id: string; children: ReactNode }) {

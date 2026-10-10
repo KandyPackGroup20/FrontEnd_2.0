@@ -1,5 +1,6 @@
 import { AlertTriangle, Clock3, Loader2 } from "lucide-react";
 import type { RosterHours, RosterStaff } from "@/lib/roster/types";
+import FatigueBadge from "./FatigueBadge";
 
 export type ReportState<T> =
   | { kind: "loading" }
@@ -55,11 +56,7 @@ export default function WeeklyHours({ state, staff }: {
                     <p className="text-sm text-text-muted">{row.staff_type === "DRIVER" ? "Driver" : "Assistant"}</p>
                     <h3 className="mt-1 text-xl">{row.staff_name ?? staffById.get(row.staff_id)?.name ?? `Staff #${row.staff_id}`}</h3>
                   </div>
-                  <span className={exceeded
-                    ? "status-pill status-pill-issue"
-                    : "status-pill status-pill-delivered"}>
-                    {exceeded ? "Limit exceeded" : "Within limit"}
-                  </span>
+                  <FatigueBadge seconds={row.scheduled_seconds} limit={row.limit_seconds} />
                 </div>
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm tabular-nums">
                   <dt className="text-text-muted">Scheduled</dt><dd>{hoursLabel(row.scheduled_seconds)}</dd>

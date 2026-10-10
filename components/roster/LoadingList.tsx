@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { assignWholeOrders, getLoadingList } from "@/lib/roster/api";
+import { assignWholeOrders, getLoadingList, startDelivery } from "@/lib/roster/api";
 import type { CargoOrder, LoadingListData, TruckSchedule } from "@/lib/roster/types";
 
 const reasons: Record<string, string> = {
@@ -16,6 +16,7 @@ const reasons: Record<string, string> = {
 export function OrderDetails({ order }: { order: CargoOrder }) {
   return <div>
     <p className="font-semibold">Order #{order.order_id} · {order.customer_name}</p>
+    <p className="text-sm">Status: {order.order_status}</p>
     <p className="mt-1 text-sm">{order.recipient_name} · {order.recipient_phone}</p>
     <p className="text-sm">{order.delivery_address}</p>
     <p className="mt-1 text-sm text-text-muted">Delivery date: {order.delivery_date} · {order.assigned_weight_kg ?? order.weight_kg} kg</p>
@@ -78,16 +79,38 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
     }
   }
 
+  async function start() {
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      await startDelivery(schedule.roster_id);
+      setMessage("Delivery started. Attached orders are out for delivery.");
+      setSelected([]);
+      setData(null);
+      setRefresh((value) => value + 1);
+      onSaved();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Delivery could not be started.");
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
   return <section className="glass mt-6 p-6" aria-labelledby="loading-title">
     <div className="flex flex-wrap justify-between gap-3">
       <h3 id="loading-title" className="text-xl">Planned loading list · Run #{schedule.roster_id}</h3>
       <button className="btn-secondary px-4 py-2" disabled={busy} onClick={onClose}>Close</button>
     </div>
     <p className="mt-2 text-sm">{current.station_name} · {current.route_name} · {current.plate_number}</p>
+    <p className="mt-2 text-sm">Run status: {current.status}</p>
+    {writable && current.status === "SCHEDULED" && <button className="btn-primary mt-3 px-4 py-2" onClick={start}
+      disabled={busy || !data || !current.is_active || current.order_count === 0 || selected.length > 0}>Start delivery</button>}
     <p className="mt-2 text-sm">{current.order_count} orders · {current.unit_count} units · {current.cargo_weight_kg} kg planned.</p>
     <p className="mt-1 text-sm text-text-muted">Capacity: {current.capacity} {verified ? "kg" : "(unit unverified)"}</p>
-    <button className="btn-secondary mt-3 px-4 py-2" disabled={busy} onClick={() => setRefresh((value) => value + 1)}>Refresh loading list</button>
-    {!data ? <p className="mt-5" role="status">Loading assigned orders…</p> : data.orders.length === 0 ? <p className="mt-5">No orders assigned yet.</p> :
+    <button className="btn-secondary mt-3 px-4 py-2" disabled={busy} onClick={() => { setData(null); setMessage(null); setRefresh((value) => value + 1); }}>Refresh loading list</button>
+    {!data ? <p className="mt-5" role="status">{message ?? "Loading assigned orders…"}</p> : data.orders.length === 0 ? <p className="mt-5">No orders assigned yet.</p> :
       <ul className="mt-5 grid gap-5 md:grid-cols-2">{data.orders.map((order) => <li key={order.order_id} className="rounded-2xl border border-green-100 p-4"><OrderDetails order={order} /></li>)}</ul>}
     {writable && <div className="mt-7">
       <h4 className="font-semibold">Add whole orders on this route</h4>

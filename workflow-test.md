@@ -69,3 +69,37 @@ Before UI approval, use a connected browser to create a schedule with real hub I
 Approval: ready for Phase 2 code review; browser/deployment verification and the pre-existing component lint debt remain explicit limitations.
 
 Phase 2 completion result: **9/9 frontend tests passed**, production build/TypeScript passed, and new-file lint passed. The sibling backend's final **28/28 real MySQL tests passed**. Component lint remains at the documented 10 existing errors/6 warnings; no browser success is claimed. All three branches remain `fullworkflow`; no push or merge.
+
+## Phase 3 member — explicit start, fatigue warnings and available crew (2026-10-10)
+
+Resumed and preserved the interrupted changes. Backend, FrontEnd_2.0 and database remain on `fullworkflow`. No applicable AGENTS.md was found; the archived option3 instructions do not apply. No README, commit, push, merge or main changes.
+
+### Changes and reasons
+
+- `components/roster/LoadingList.tsx`: adds explicit Start delivery for a scheduled run with attached orders. It sends only the start request, prevents duplicate clicks, displays run/order statuses and refreshes loading list and parent demand/schedules. Disables starting an inactive truck or a run with unsaved order selections. Clears stale loading-list data after a successful start and on manual refresh; failures retain actionable messages and retry. Existing attach-whole-orders remains separate.
+- `components/roster/AssignmentForm.tsx`: requests eligible crew when route, truck, interval or selected counterpart changes. Aborts obsolete requests and keys results to their inputs so old results cannot enable submission. Removes selections absent from fresh eligibility results and explains why. Shows loading/errors, offers manual availability refresh, and disables selection/submission while results are unavailable. Displays every affected Colombo week's scheduled/proposed hours, limit, remaining hours and projected fatigue badge beside eligible staff.
+- `components/roster/WeeklyHours.tsx`, new `components/roster/FatigueBadge.tsx`, new `lib/roster/fatigue.ts`: shared green below 90%, yellow from exactly 90% through exactly 100%, red above 100%. Existing selected-week reporting and driver/assistant limits are unchanged. Projection badges explicitly include the proposed assignment; weekly report badges use scheduled hours.
+- `lib/roster/api.ts`: same-origin, no-store client calls to GET `/api/v1/roster/availability` and POST `/api/v1/roster/schedules/{id}/start`, validated response contracts and replay results. Existing create and attach requests are unchanged.
+- `tests/roster-api.test.mjs`: new start/availability/rewrite contract checks; component loader resolves the shared badge; rendered weekly warning boundaries verified.
+- New `tests/roster-fatigue.test.mjs`: exact driver/assistant warning boundaries, including one second below/above thresholds.
+- `workflow-test.md`: this appended record.
+
+Missing functionality was explicit dispatch, interval-filtered crew, and yellow warning thresholds. Existing forms, schedule/loading-list UI, cookie transport, policy and reporting were reused. On resume, clarified availability loading/error/retry handling and removed stale start controls during loading-list refresh.
+
+### Proxy, policy and SQL dependencies
+
+Inspected and tested existing `next.config.ts` rewrite `/api/v1/:path*` → configured backend `/api/v1/:path*`; it covers both new paths with no endpoint allowlist change. Existing middleware matcher excludes `api/`, leaving current database-backed FastAPI authorization intact. Candidate filtering is advisory: the unchanged final backend assignment transaction locks route/truck/crew/history and invokes the same policy again. Original rest rules, exact weekly caps and accepted-only roster audit are preserved. No combined create/attach/start action, inventory deduction or delivery completion was introduced.
+
+No SQL or migration is required for Phase 3. Requires matching backend, existing roster/rail/receipt schema and `ROSTER_DATA_MODE=mysql`. Database repository remains unchanged. Do not initialize/reset an existing database for these changes.
+
+### Actual verification after resume
+
+- `node --test tests/roster-api.test.mjs tests/roster-fatigue.test.mjs`: **47/47 passed**. Includes cookie/error transport, separate start/replay, selected counterpart and cross-week projection contract, rewrite/middleware configuration, rendered weekly badges and exact 40/60-hour boundaries.
+- `npx tsc --noEmit`: passed.
+- `npx eslint components/roster/AssignmentForm.tsx components/roster/LoadingList.tsx components/roster/WeeklyHours.tsx components/roster/FatigueBadge.tsx lib/roster/api.ts lib/roster/fatigue.ts`: passed. This does not claim the unrelated repository-wide lint debt is fixed.
+- `git diff --check`: passed for all three repositories.
+- Matching backend: **34/34 real FastAPI/MySQL integration tests** in a newly created disposable schema, plus **11 hours + 5 availability + 17 policy tests**, all passed. Tests cover actual receipt-to-start, separate flow, dispatcher authorization, duplicate/concurrent start, invalid transitions, rollback, unchanged inventory, overlap/rest/cap filtering and cross-week calculations. Existing databases were not reset.
+
+### Remaining checks / review status
+
+The Browser skill returned “No browser is available” and an empty browser list. Therefore no interactive browser or live Next-proxy end-to-end success is claimed. Configuration and client contracts were tested, and UI wiring reviewed; manual browser verification remains for selection clearing after input changes, loading/error/retry behavior, status refresh, double clicks and responsive display. The backend independently verifies all submitted actions. No production build was rerun for Phase 3; TypeScript and scoped lint were run as listed. Ready for code review, with browser verification still required for UI approval. Inventory/delivery-completion workflows belong to later scope.

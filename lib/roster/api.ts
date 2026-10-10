@@ -477,3 +477,34 @@ export async function assignWholeOrders(rosterId: number, orderIds: number[]): P
     || !body.order_ids.every(isId)
     || [...body.order_ids].sort((a, b) => a - b).join(",") !== [...orderIds].sort((a, b) => a - b).join(",")) invalidResponse();
 }
+
+export interface EligibleCrew {
+  staff_id: number; name: string; staff_type: "DRIVER" | "ASSISTANT";
+  weeks: { week_start: string; scheduled_seconds: number; proposed_seconds: number;
+    projected_seconds: number; limit_seconds: number; remaining_seconds: number }[];
+}
+export interface CrewAvailability {
+  drivers: EligibleCrew[]; assistants: EligibleCrew[];
+  excluded: { staff_id: number; message: string }[];
+}
+
+export async function getCrewAvailability(params: Record<string, string>, signal: AbortSignal): Promise<CrewAvailability> {
+  const body = await readJson(`/api/v1/roster/availability?${new URLSearchParams(params)}`, signal);
+  const validCrew = (value: unknown) => isRecord(value) && isId(value.staff_id) && isText(value.name)
+    && ["DRIVER", "ASSISTANT"].includes(String(value.staff_type)) && Array.isArray(value.weeks)
+    && value.weeks.length > 0 && value.weeks.every((week) => isRecord(week) && isMonday(week.week_start)
+      && [week.scheduled_seconds, week.proposed_seconds, week.projected_seconds].every(isNonNegativeInteger)
+      && isId(week.limit_seconds) && isInteger(week.remaining_seconds));
+  if (!isRecord(body) || body.timezone !== "Asia/Colombo" || !Array.isArray(body.drivers)
+    || !Array.isArray(body.assistants) || !body.drivers.every((s) => validCrew(s) && s.staff_type === "DRIVER")
+    || !body.assistants.every((s) => validCrew(s) && s.staff_type === "ASSISTANT")
+    || !Array.isArray(body.excluded) || !body.excluded.every((row) => isRecord(row) && isId(row.staff_id) && isText(row.message))) invalidResponse();
+  return body as unknown as CrewAvailability;
+}
+
+export async function startDelivery(rosterId: number): Promise<void> {
+  if (!isId(rosterId)) throw new RangeError("Select a valid truck schedule.");
+  const body = await writeJson(`/api/v1/roster/schedules/${rosterId}/start`, {}, null);
+  if (!isRecord(body) || body.status !== "SUCCESS" || body.roster_id !== rosterId
+    || !["DELIVERY_STARTED", "DELIVERY_ALREADY_STARTED"].includes(String(body.result_code))) invalidResponse();
+}
