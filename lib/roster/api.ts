@@ -239,7 +239,7 @@ export async function getRosterCandidates(signal: AbortSignal): Promise<RosterCa
     || !Array.isArray(body.assistants) || !body.assistants.every((item) => isStaff(item, "ASSISTANT"))) invalidResponse();
   if (body.meta.data_source === "mysql") {
     if (!body.routes.every((route) => /^[1-9]\d*$/.test(route.station_id))
-      || !body.trucks.every((truck) => truck.station_id === null)) invalidResponse();
+      || !body.trucks.every((truck) => truck.station_id === null || /^[1-9]\d*$/.test(truck.station_id))) invalidResponse();
   } else if (!body.trucks.every((truck) => isText(truck.station_id))) invalidResponse();
   return body as unknown as RosterCandidates;
 }
