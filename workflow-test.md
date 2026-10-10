@@ -103,3 +103,37 @@ No SQL or migration is required for Phase 3. Requires matching backend, existing
 ### Remaining checks / review status
 
 The Browser skill returned “No browser is available” and an empty browser list. Therefore no interactive browser or live Next-proxy end-to-end success is claimed. Configuration and client contracts were tested, and UI wiring reviewed; manual browser verification remains for selection clearing after input changes, loading/error/retry behavior, status refresh, double clicks and responsive display. The backend independently verifies all submitted actions. No production build was rerun for Phase 3; TypeScript and scoped lint were run as listed. Ready for code review, with browser verification still required for UI approval. Inventory/delivery-completion workflows belong to later scope.
+
+## Phase 4 member — Station inventory and regional warehouse UI (2026-10-10)
+
+Started from clean `fullworkflow` branches; previous work preserved. No applicable AGENTS.md outside the archived checkout. No README, main, commit, push or merge changes.
+
+### Working features reused and changes
+
+The existing `/warehouse` page already fetched real inventory, manifests, cargo details, bins, adjustment history and Report 6. Reused it and the existing `/api/v1/inventory` contracts instead of creating parallel station pages/endpoints.
+
+- `app/warehouse/page.tsx`: replaces hardcoded station IDs and fake default operator with authenticated profile and authorized `/inventory/stations` choices. No assigned station gives an explicit error. Preserves real role instead of coercing every non-warehouse account to manager. Station changes clear stale data and in-flight station responses cannot overwrite a newer selection. Selector is disabled during mutations.
+- Same file: incoming dashboard shows actual allocated cargo units and train status; Confirm Station Intake only enables for nonempty ARRIVED trains. Existing backend revalidates arrival time and receipt eligibility. Immediate duplicate-click guard and post-mutation stock/manifest/report refresh retained.
+- Same file: adds product/bin search and native, labelled stock-adjustment dialog with per-product Report damage shortcut. DAMAGED/LOST/EXPIRED presets, negative prefill, existing recount corrections/history and bin controls reused. Adjustment request key remains stable across failures/retries of the same payload and changes when the payload changes. Successful save closes the dialog and refreshes stock/report/history. Server remains authoritative for scope/stock constraints.
+- `app/profile/page.tsx`: minimal provisioning integration—SuperAdmin loads real station choices and must select an assigned station when creating warehouse staff. `/admin/users` already reuses this form. No identity workflow redesign.
+- `tests/warehouse.test.mjs`: actual component initial-render checks for no fabricated account/station data, labelled search and native damage dialog/reason choices. These do not simulate browser interactions.
+- `workflow-test.md`: this record.
+
+### Contracts and initialization
+
+Existing same-origin Next rewrite covers all inventory and auth requests; no proxy change required. Existing singular schema and reason VARCHAR are baseline: prompt plural tables and ENUM names were not duplicated. Project-plan PDF confirms location_id bins and station-level manager scoping. Warehouse staff lacked a mapping; explicit nullable user.station_id was selected based on the plan when the clarification question went unanswered. Unassigned legacy staff require approved assignment; no email/seed guessing.
+
+Deploy matching backend after applying `database/16_phase4_station_workflow.sql` to the selected DB during a station-write pause. No SQL runs from frontend. Existing managers retain station_store.manager_id; legacy warehouse assignments must be populated explicitly. Fresh provisioning uses the station selector. Do not reset an existing DB.
+
+### Actual verification
+
+- `node --test tests/phase1-auth.test.mjs tests/rail-input.test.mjs tests/roster-api.test.mjs tests/roster-fatigue.test.mjs`: **56/56 passed**.
+- `node --test tests/warehouse.test.mjs`: **2/2 passed**.
+- `npx tsc --noEmit`: passed after final UI edits.
+- `node node_modules/eslint/bin/eslint.js app/warehouse/page.tsx app/profile/page.tsx`: zero errors; three existing warehouse warnings (unused getAuthToken and two window.location navigation recommendations). No repository-wide lint cleanup claimed.
+- Sibling backend full real-MySQL/FastAPI suite: **43/43 passed**, including nine station tests and 34 earlier lifecycle regressions. Disposable schema only, then cleanup. Covers scope, receipt rollback/concurrency, adjustment idempotency/underflow, real report totals, bin replay and warehouse provisioning. Final SQL null-state refinement has a separate affected-receipt rerun recorded in backend/database logs.
+- Migration source consistency and `git diff --check` passed.
+
+### Remaining verification
+
+Browser runtime was checked again and returned `[]`; interactive UI, live proxy, dialog keyboard behavior, mutation/retry/station-switching interactions and narrow-screen layout remain unverified. No production build was run in Phase 4. Ready for code review with these explicit UI/deployment prerequisites, not full-lifecycle approval. Dispatch inventory deduction, delivery completion, barcode/photo package tracking and unrelated reporting redesign were not added.

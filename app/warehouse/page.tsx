@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Train,
@@ -22,18 +22,10 @@ import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
 import { apiFetch, describeError, ApiError, getAuthToken, setAuthToken } from "@/lib/api";
 
-// These ids match station_store in the database (06_seed_data.sql).
-const STATIONS = [
-  { id: 1, name: "Colombo" },
-  { id: 2, name: "Negombo" },
-  { id: 3, name: "Galle" },
-  { id: 4, name: "Matara" },
-  { id: 5, name: "Jaffna" },
-  { id: 6, name: "Trincomalee" },
-  { id: 7, name: "Kandy" },
-];
-
 const STANDARD_REASONS = [
+  "DAMAGED",
+  "LOST",
+  "EXPIRED",
   "Damaged during unloading - crushed carton",
   "Missing item - short shipment from train",
   "Water / moisture damage in storage",
@@ -58,6 +50,7 @@ type StockRow = {
 };
 
 type ManifestRow = {
+  cargo_units: number;
   manifest_id: number;
   station_id: number;
   destination_station: string;
@@ -127,7 +120,14 @@ type ReportSummary = {
 type Banner = { type: "success" | "error"; text: string } | null;
 
 export default function WarehousePage() {
-  const [stationId, setStationId] = useState(1);
+  const [stationId, setStationId] = useState(0);
+  const [stations, setStations] = useState<{ station_id: number; city: string }[]>([]);
+  const [search, setSearch] = useState("");
+  const fetchVersion = useRef(0);
+  const receiveBusy = useRef(false);
+  const adjustmentBusy = useRef(false);
+  const adjustmentRequest = useRef<{ body: string; key: string } | null>(null);
+  const damageDialog = useRef<HTMLDialogElement>(null);
   const [stock, setStock] = useState<StockRow[]>([]);
   const [manifests, setManifests] = useState<ManifestRow[]>([]);
   const [manifestsNote, setManifestsNote] = useState<string | null>(null);
@@ -151,12 +151,12 @@ export default function WarehousePage() {
   // Authenticated Employee Profile
   const [operator, setOperator] = useState<{
     name: string;
-    role: "STORE_MGR" | "WAREHOUSE_STAFF";
+    role: string;
     email: string;
   }>({
-    name: "Sunil Colombo Store Mgr",
-    role: "STORE_MGR",
-    email: "store.colombo@kandypack.lk",
+    name: "Loading account…",
+    role: "",
+    email: "",
   });
 
   // Receive a manifest
@@ -176,6 +176,7 @@ export default function WarehousePage() {
 
   // Fetches stock + manifests + available bins + Report 6 summary for the chosen station.
   const fetchStationData = useCallback(async (id: number) => {
+    const version = ++fetchVersion.current;
     const [stockResult, manifestResult, binsResult, reportResult] = await Promise.allSettled([
       apiFetch<{ inventory: StockRow[] }>(`/inventory/?station_id=${id}`),
       apiFetch<{ manifests: ManifestRow[] }>(`/inventory/manifests?station_id=${id}`),
@@ -183,6 +184,7 @@ export default function WarehousePage() {
       apiFetch<ReportSummary>(`/inventory/reports/summary?station_id=${id}`),
     ]);
 
+    if (version !== fetchVersion.current) return;
     if (stockResult.status === "rejected") throw stockResult.reason;
     setStock(stockResult.value.inventory);
 
@@ -194,18 +196,18 @@ export default function WarehousePage() {
       const reason = manifestResult.reason;
       setManifestsNote(
         reason instanceof ApiError && reason.status === 403
-          ? "Train manifests are only visible to Store Managers."
+          ? "You do not have access to these train manifests."
           : describeError(reason)
       );
     }
 
     if (binsResult.status === "fulfilled") {
       setAvailableBins(binsResult.value.bins);
-    }
+    } else setAvailableBins([]);
 
     if (reportResult.status === "fulfilled") {
       setSummaryReport(reportResult.value);
-    }
+    } else setSummaryReport(null);
   }, []);
 
 
@@ -226,11 +228,19 @@ export default function WarehousePage() {
         if (!cancelled) {
           setOperator({
             name: user.name,
-            role: user.role === "WAREHOUSE_STAFF" ? "WAREHOUSE_STAFF" : "STORE_MGR",
+            role: user.role,
             email: user.email,
           });
         }
 
+        const choices = await apiFetch<{ stations: { station_id: number; city: string }[] }>("/inventory/stations");
+        if (cancelled) return;
+        setStations(choices.stations);
+        if (!choices.stations.length) throw new Error("No active station is assigned to your account. Contact your administrator.");
+        if (!choices.stations.some((s) => s.station_id === stationId)) {
+          setStationId(choices.stations[0].station_id);
+          return;
+        }
         await fetchStationData(stationId);
         if (!cancelled) setBanner(null);
       } catch (err) {
@@ -253,6 +263,15 @@ export default function WarehousePage() {
 
 
   function handleStationChange(id: number) {
+    fetchVersion.current += 1;
+    setStock([]);
+    setManifests([]);
+    setAvailableBins([]);
+    setSummaryReport(null);
+    setExpandedTripId(null);
+    setCargoItems({});
+    setEditingBinInvId(null);
+    adjustmentRequest.current = null;
     setLoading(true);
     setHistoryFor(null);
     setAdjustInventoryId("");
@@ -317,6 +336,8 @@ export default function WarehousePage() {
   }
 
   async function handleReceive(tripId: number) {
+    if (receiveBusy.current) return;
+    receiveBusy.current = true;
     setReceivingTripId(tripId);
     setBanner(null);
     try {
@@ -332,6 +353,7 @@ export default function WarehousePage() {
     } catch (err) {
       setBanner({ type: "error", text: describeError(err) });
     } finally {
+      receiveBusy.current = false;
       setReceivingTripId(null);
     }
   }
@@ -358,6 +380,7 @@ export default function WarehousePage() {
 
   async function handleAdjustSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (adjustmentBusy.current) return;
     const delta = Number(adjustDelta);
 
     const finalReason =
@@ -384,17 +407,19 @@ export default function WarehousePage() {
       return;
     }
 
+    adjustmentBusy.current = true;
     setAdjustSubmitting(true);
     setBanner(null);
     try {
+      const body = JSON.stringify({ inventory_id: Number(adjustInventoryId), quantity_delta: delta, reason: finalReason });
+      if (adjustmentRequest.current?.body !== body) adjustmentRequest.current = { body, key: crypto.randomUUID() };
       const res = await apiFetch<{ new_stored_quantity: number }>("/inventory/adjustments", {
         method: "POST",
-        body: JSON.stringify({
-          inventory_id: Number(adjustInventoryId),
-          quantity_delta: delta,
-          reason: finalReason,
-        }),
+        headers: { "Idempotency-Key": adjustmentRequest.current.key },
+        body,
       });
+      adjustmentRequest.current = null;
+      damageDialog.current?.close();
       setBanner({
         type: "success",
         text: `Adjustment saved. New stock level: ${res.new_stored_quantity}.`,
@@ -413,6 +438,7 @@ export default function WarehousePage() {
     } catch (err) {
       setBanner({ type: "error", text: describeError(err) });
     } finally {
+      adjustmentBusy.current = false;
       setAdjustSubmitting(false);
     }
   }
@@ -444,7 +470,7 @@ export default function WarehousePage() {
                 <span>Active Portal Session</span>
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                 <span className="font-bold text-green-800">
-                  {operator.role === "STORE_MGR" ? "Store Manager" : "Warehouse Staff"}
+                  {operator.role.replaceAll("_", " ")}
                 </span>
               </div>
               <div className="text-sm font-bold text-text-heading">
@@ -492,11 +518,13 @@ export default function WarehousePage() {
               id="station"
               className="input"
               value={stationId}
+              disabled={receivingTripId !== null || adjustSubmitting || assigningBin}
               onChange={(e) => handleStationChange(Number(e.target.value))}
             >
-              {STATIONS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+              <option value={0} disabled>Select assigned station</option>
+              {stations.map((s) => (
+                <option key={s.station_id} value={s.station_id}>
+                  {s.city}
                 </option>
               ))}
             </select>
@@ -682,6 +710,7 @@ export default function WarehousePage() {
                           <div className="flex items-center gap-2 text-sm font-semibold text-text-heading">
                             <Train className="h-4 w-4 text-green-600" />
                             Trip #{m.trip_id} from Kandy
+                            <span>{m.cargo_units} units · {m.train_status}</span>
                           </div>
                           <div className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
                             <Calendar className="h-3.5 w-3.5" />
@@ -711,9 +740,9 @@ export default function WarehousePage() {
                             <Button
                               size="sm"
                               onClick={() => handleReceive(m.trip_id)}
-                              disabled={receivingTripId === m.trip_id}
+                              disabled={receivingTripId !== null || m.train_status !== "ARRIVED" || m.cargo_units === 0}
                             >
-                              {receivingTripId === m.trip_id ? "Receiving..." : "Receive"}
+                              {receivingTripId === m.trip_id ? "Receiving..." : "Confirm Station Intake"}
                             </Button>
                           )}
                         </div>
@@ -777,6 +806,8 @@ export default function WarehousePage() {
             <h2 id="stock-title" className="mb-4 text-lg font-semibold text-text-heading">
               Station Stock &amp; Storage Bins
             </h2>
+            <label className="input-label" htmlFor="stock-search">Search product or bin</label>
+            <input id="stock-search" className="input mb-4" value={search} onChange={(e) => setSearch(e.target.value)} />
 
             {loading && <p className="text-sm text-text-muted">Loading...</p>}
             {!loading && stock.length === 0 && (
@@ -784,7 +815,7 @@ export default function WarehousePage() {
             )}
 
             <ul className="space-y-3">
-              {stock.map((row) => (
+              {stock.filter((row) => `${row.product_name} ${row.bin_code ?? ""}`.toLowerCase().includes(search.toLowerCase())).map((row) => (
                 <li key={row.inventory_id} className="glass-sm p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -858,6 +889,10 @@ export default function WarehousePage() {
                       <div className="tabular-nums text-xl font-bold text-text-heading">
                         {row.stored_quantity}
                       </div>
+                      <button type="button" className="btn-secondary px-3 py-2" onClick={() => {
+                        setAdjustInventoryId(String(row.inventory_id)); setAdjustDelta("-1");
+                        setAdjustReasonPreset(STANDARD_REASONS[0]); damageDialog.current?.showModal();
+                      }}>Report damage</button>
                       <button
                         type="button"
                         onClick={() => loadHistory(row.inventory_id)}
@@ -906,7 +941,9 @@ export default function WarehousePage() {
         </div>
 
         {/* Log a stock adjustment */}
-        <section className="glass mt-6 p-6" aria-labelledby="adjust-title">
+        <button type="button" className="btn-secondary mt-6 px-4 py-2" disabled={!stock.length} onClick={() => damageDialog.current?.showModal()}>Log stock adjustment</button>
+        <dialog ref={damageDialog} className="glass m-auto w-[min(95vw,800px)] p-6 backdrop:bg-black/40" aria-labelledby="adjust-title">
+          <button type="button" className="btn-secondary float-right px-3 py-2" disabled={adjustSubmitting} onClick={() => damageDialog.current?.close()}>Close</button>
           <h2 id="adjust-title" className="mb-1 text-lg font-semibold text-text-heading">
             Log a Stock Adjustment
           </h2>
@@ -992,7 +1029,8 @@ export default function WarehousePage() {
               </Button>
             </div>
           </form>
-        </section>
+          {banner?.type === "error" && <p role="alert" className="mt-3">{banner.text}</p>}
+        </dialog>
       </div>
     </div>
   );

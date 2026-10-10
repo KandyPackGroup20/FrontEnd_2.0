@@ -73,6 +73,8 @@ function ProfileContent() {
   const [newStaffRole, setNewStaffRole] = useState("DISPATCHER");
   const [newStaffPassword, setNewStaffPassword] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
+  const [warehouseStation, setWarehouseStation] = useState("");
+  const [stationChoices, setStationChoices] = useState<{ station_id: number; city: string }[]>([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [staffSuccess, setStaffSuccess] = useState("");
@@ -116,6 +118,8 @@ function ProfileContent() {
 
         if (data.role === "SUPERADMIN") {
           loadAllUsers();
+          const stationsResponse = await fetch('/api/v1/inventory/stations', { cache: 'no-store' });
+          if (stationsResponse.ok) setStationChoices((await stationsResponse.json()).stations);
         }
       } else if (res.status === 401) {
         router.push("/login?redirect=/profile");
@@ -163,6 +167,7 @@ function ProfileContent() {
           role: newStaffRole,
           password: newStaffPassword,
           license_number: licenseNumber || null,
+          ...(newStaffRole === 'WAREHOUSE_STAFF' ? { station_id: Number(warehouseStation) } : {}),
         }),
       });
 
@@ -645,6 +650,13 @@ function ProfileContent() {
                   <label htmlFor="staff-password" className="block text-xs font-semibold mb-1">Temporary password</label>
                   <input id="staff-password" type="password" required minLength={6} autoComplete="new-password" value={newStaffPassword} onChange={e => setNewStaffPassword(e.target.value)} className="w-full rounded-xl border px-3 py-2" />
                 </div>
+                {newStaffRole === "WAREHOUSE_STAFF" && <div>
+                  <label htmlFor="staff-station" className="block text-xs font-semibold mb-1">Assigned station</label>
+                  <select id="staff-station" required value={warehouseStation} onChange={e => setWarehouseStation(e.target.value)} className="w-full rounded-xl border px-3 py-2">
+                    <option value="">Select station</option>
+                    {stationChoices.map(s => <option key={s.station_id} value={s.station_id}>{s.city}</option>)}
+                  </select>
+                </div>}
                 {(newStaffRole === "DRIVER" || newStaffRole === "ASSISTANT") && <div>
                   <label htmlFor="staff-license" className="block text-xs font-semibold mb-1">License / staff reference</label>
                   <input id="staff-license" required maxLength={100} value={licenseNumber} onChange={e => setLicenseNumber(e.target.value)} className="w-full rounded-xl border px-3 py-2" />
