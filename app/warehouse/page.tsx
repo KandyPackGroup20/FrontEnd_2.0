@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   BarChart3,
   LogOut,
+  RefreshCw,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
@@ -151,7 +152,7 @@ export default function WarehousePage() {
   // Authenticated Employee Profile
   const [operator, setOperator] = useState<{
     name: string;
-    role: "STORE_MGR" | "WAREHOUSE_STAFF";
+    role: "STORE_MGR" | "WAREHOUSE_STAFF" | "LOGISTICS_MGR" | "SUPERADMIN" | string;
     email: string;
   }>({
     name: "Sunil Colombo Store Mgr",
@@ -194,7 +195,7 @@ export default function WarehousePage() {
       const reason = manifestResult.reason;
       setManifestsNote(
         reason instanceof ApiError && reason.status === 403
-          ? "Train manifests are only visible to Store Managers."
+          ? "Train manifests are only visible to Store Managers and authorized personnel."
           : describeError(reason)
       );
     }
@@ -208,22 +209,21 @@ export default function WarehousePage() {
     }
   }, []);
 
-
-
-  // Check active user session on load and fetch station data
+  // Check active user session on initial load
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Fetch currently authenticated profile from backend
         const user = await apiFetch<{
           user_id: number;
           name: string;
           email: string;
-          role: "STORE_MGR" | "WAREHOUSE_STAFF" | string;
+          role: string;
         }>("/auth/me");
 
-        let initialStationId = stationId;
+        if (cancelled) return;
+
+        let initialStationId = 1;
         const emailLower = (user.email || "").toLowerCase();
         if (emailLower.includes("galle")) initialStationId = 3;
         else if (emailLower.includes("colombo")) initialStationId = 1;
@@ -233,20 +233,17 @@ export default function WarehousePage() {
         else if (emailLower.includes("trinco")) initialStationId = 6;
         else if (emailLower.includes("kandy")) initialStationId = 7;
 
-        if (!cancelled) {
-          setStationId(initialStationId);
-          setOperator({
-            name: user.name,
-            role: user.role === "WAREHOUSE_STAFF" ? "WAREHOUSE_STAFF" : "STORE_MGR",
-            email: user.email,
-          });
-        }
+        setStationId(initialStationId);
+        setOperator({
+          name: user.name,
+          role: user.role,
+          email: user.email,
+        });
 
         await fetchStationData(initialStationId);
-        if (!cancelled) setBanner(null);
+        setBanner(null);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          // If not authenticated, redirect to login
           if (typeof window !== "undefined") {
             window.location.href = "/login";
           }
@@ -260,14 +257,31 @@ export default function WarehousePage() {
     return () => {
       cancelled = true;
     };
-  }, [stationId, fetchStationData]);
+  }, [fetchStationData]);
 
+  // Window focus and live interval auto-refresher
+  useEffect(() => {
+    function onFocus() {
+      fetchStationData(stationId).catch(() => {});
+    }
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(() => {
+      fetchStationData(stationId).catch(() => {});
+    }, 15000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
+  }, [stationId, fetchStationData]);
 
   function handleStationChange(id: number) {
     setLoading(true);
     setHistoryFor(null);
     setAdjustInventoryId("");
     setStationId(id);
+    fetchStationData(id)
+      .catch((err) => setBanner({ type: "error", text: describeError(err) }))
+      .finally(() => setLoading(false));
   }
 
   async function reloadStation() {
@@ -455,7 +469,13 @@ export default function WarehousePage() {
                 <span>Active Portal Session</span>
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                 <span className="font-bold text-green-800">
-                  {operator.role === "STORE_MGR" ? "Store Manager" : "Warehouse Staff"}
+                  {operator.role === "STORE_MGR"
+                    ? "Store Manager"
+                    : operator.role === "WAREHOUSE_STAFF"
+                    ? "Warehouse Staff"
+                    : operator.role === "LOGISTICS_MGR"
+                    ? "Logistics Manager"
+                    : "Administrator"}
                 </span>
               </div>
               <div className="text-sm font-bold text-text-heading">
@@ -515,6 +535,11 @@ export default function WarehousePage() {
             {(operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF") && (
               <span className="text-[11px] text-text-muted mt-1 block">
                 Assigned station for your account
+              </span>
+            )}
+            {(operator.role === "LOGISTICS_MGR" || operator.role === "SUPERADMIN") && (
+              <span className="text-[11px] text-green-700 font-medium mt-1 block">
+                Multi-hub network oversight active
               </span>
             )}
           </div>
@@ -671,9 +696,20 @@ export default function WarehousePage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Incoming manifests */}
           <section className="glass p-6" aria-labelledby="manifests-title">
-            <h2 id="manifests-title" className="mb-4 text-lg font-semibold text-text-heading">
-              Incoming Train Manifests
-            </h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="manifests-title" className="text-lg font-semibold text-text-heading">
+                Incoming Train Manifests
+              </h2>
+              <button
+                type="button"
+                onClick={reloadStation}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-green-200 hover:bg-green-50 text-green-700 font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Refresh manifests"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-green-600" : ""}`} />
+                Refresh
+              </button>
+            </div>
 
               {loading && <p className="text-sm text-text-muted">Loading...</p>}
               {!loading && manifestsNote && (
