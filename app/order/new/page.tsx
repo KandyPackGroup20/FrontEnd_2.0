@@ -150,6 +150,37 @@ const CATEGORIES = [
   { id: "Hardware & Industrial", label: "Hardware & Industrial", icon: "🏺" },
 ];
 
+interface DeliveryRouteOption {
+  route_id: number;
+  route_name: string;
+  station_id: number;
+  city: string;
+  max_delivery_time?: string;
+  station_address?: string;
+}
+
+const FALLBACK_ROUTES: Record<string, DeliveryRouteOption[]> = {
+  CMB: [
+    { route_id: 1, route_name: "Colombo Central Commercial Route", station_id: 1, city: "Colombo", max_delivery_time: "04:30:00" },
+    { route_id: 2, route_name: "Greater Colombo Industrial Hub Route", station_id: 1, city: "Colombo", max_delivery_time: "06:00:00" },
+  ],
+  GAL: [
+    { route_id: 3, route_name: "Galle Coastal Route", station_id: 3, city: "Galle", max_delivery_time: "05:00:00" },
+  ],
+  NEG: [
+    { route_id: 4, route_name: "Negombo Coastal & Industrial Route", station_id: 2, city: "Negombo", max_delivery_time: "04:00:00" },
+  ],
+  MAT: [
+    { route_id: 5, route_name: "Matara Southern Express Route", station_id: 4, city: "Matara", max_delivery_time: "04:30:00" },
+  ],
+  JAF: [
+    { route_id: 6, route_name: "Jaffna Northern Peninsula Route", station_id: 5, city: "Jaffna", max_delivery_time: "05:00:00" },
+  ],
+  TRN: [
+    { route_id: 7, route_name: "Trincomalee Eastern Port Route", station_id: 6, city: "Trincomalee", max_delivery_time: "04:30:00" },
+  ],
+};
+
 export default function NewOrderPage() {
   const [step, setStep] = useState(1);
   const [products, setProducts] = useState<CatalogueProduct[]>(FALLBACK_PRODUCTS);
@@ -164,6 +195,10 @@ export default function NewOrderPage() {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+
+  // Delivery routes state
+  const [routesList, setRoutesList] = useState<DeliveryRouteOption[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState<number>(1);
 
   // Schedule state
   const [bookingDate, setBookingDate] = useState(() => {
@@ -182,7 +217,7 @@ export default function NewOrderPage() {
   const [sidebarTab, setSidebarTab] = useState<"unread" | "history">("unread");
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  // Fetch live catalogue from backend
+  // Fetch live catalogue & delivery routes from backend
   useEffect(() => {
     async function loadCatalogue() {
       try {
@@ -197,10 +232,46 @@ export default function NewOrderPage() {
         console.error("Failed to load backend catalogue, using built-in catalogue", err);
       }
     }
+
+    async function loadRoutes() {
+      try {
+        const res = await fetch("/api/v1/orders/routes");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setRoutesList(data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load routes from backend", err);
+      }
+    }
+
     loadCatalogue();
+    loadRoutes();
   }, []);
 
   const currentHub = HUBS.find((h) => h.id === selectedHub) || HUBS[0];
+
+  // Available routes for the selected hub
+  const availableRoutesForHub = (() => {
+    const hubCity = currentHub.name.toLowerCase();
+    const filtered = routesList.filter((r) => (r.city || "").toLowerCase() === hubCity);
+    if (filtered.length > 0) return filtered;
+    return FALLBACK_ROUTES[selectedHub] || FALLBACK_ROUTES.CMB;
+  })();
+
+  // Synchronize selected route when hub changes
+  useEffect(() => {
+    if (availableRoutesForHub.length > 0) {
+      const exists = availableRoutesForHub.some((r) => r.route_id === selectedRouteId);
+      if (!exists) {
+        setSelectedRouteId(availableRoutesForHub[0].route_id);
+      }
+    }
+  }, [selectedHub, availableRoutesForHub, selectedRouteId]);
+
+  const currentRoute = availableRoutesForHub.find((r) => r.route_id === selectedRouteId) || availableRoutesForHub[0];
 
   // Cart operations
   function updateQuantity(productId: number, delta: number) {
@@ -276,6 +347,7 @@ export default function NewOrderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           destination_hub: currentHub.id,
+          delivery_route_id: selectedRouteId,
           cargo_type: selectedItemsList[0]?.category || "General",
           cargo_description: selectedItemsList.map((i) => `${i.product_name} (${i.quantity})`).join(", "),
           weight_kg: totalWeightKg,
@@ -761,6 +833,63 @@ export default function NewOrderPage() {
                     </div>
                   </div>
 
+                  {/* Delivery Route Selector */}
+                  <div className="mb-6 bg-white/90 p-5 rounded-2xl border border-green-200/90 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-green-100">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-green-800 flex items-center gap-1.5">
+                          <Truck className="h-4 w-4 text-green-600" />
+                          Last-Mile Delivery Route ({currentHub.name} Regional Hub)
+                        </label>
+                        <p className="text-xs text-text-muted mt-0.5">
+                          Select the local distribution route from {currentHub.station} for final truck dispatch to the recipient.
+                        </p>
+                      </div>
+                      <span className="self-start sm:self-auto text-[11px] bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full font-bold">
+                        Required
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {availableRoutesForHub.map((rt) => {
+                        const isSelected = selectedRouteId === rt.route_id;
+                        return (
+                          <div
+                            key={rt.route_id}
+                            onClick={() => setSelectedRouteId(rt.route_id)}
+                            className={`cursor-pointer rounded-xl border p-3.5 transition-all flex items-start gap-3 ${
+                              isSelected
+                                ? "border-green-600 bg-green-50/80 ring-2 ring-green-600/20 shadow-xs"
+                                : "border-gray-200 bg-white hover:border-green-300"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="delivery_route"
+                              checked={isSelected}
+                              onChange={() => setSelectedRouteId(rt.route_id)}
+                              className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-bold text-text-heading flex items-center justify-between gap-1">
+                                <span className="truncate">{rt.route_name}</span>
+                                <span className="text-[10px] text-gray-500 font-mono shrink-0">Route #{rt.route_id}</span>
+                              </div>
+                              <p className="text-[11px] text-text-muted mt-1 leading-snug">
+                                Assigned regional distribution for {rt.city} and neighboring sectors
+                              </p>
+                              {rt.max_delivery_time && (
+                                <div className="text-[10px] text-green-700 font-medium mt-1">
+                                  ⏱️ Target Dispatch: ~{rt.max_delivery_time} window
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between pt-4 border-t border-green-100">
                     <button
                       type="button"
@@ -907,6 +1036,7 @@ export default function NewOrderPage() {
                         Rail Route Details
                       </div>
                       <div><strong>Destination Hub:</strong> {currentHub.name} ({currentHub.station})</div>
+                      <div><strong>Delivery Route:</strong> {currentRoute?.route_name || `Route #${selectedRouteId}`}</div>
                       <div><strong>Distance:</strong> {currentHub.distanceKm} km from Kandy Central Goods Yard</div>
                       <div><strong>Scheduled Departure:</strong> {bookingDate} ({slot})</div>
                     </div>
