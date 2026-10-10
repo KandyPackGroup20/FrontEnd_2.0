@@ -78,6 +78,9 @@ export default function Navbar() {
     ...(currentUser && ["DISPATCHER", "SUPERADMIN", "LOGISTICS_MGR"].includes(currentUser.role)
       ? [{ label: "Truck Roster", href: "/admin/roster" }]
       : []),
+    ...(currentUser && ["DRIVER", "SUPERADMIN"].includes(currentUser.role)
+      ? [{ label: "Driver Runs", href: "/driver" }]
+      : []),
   ];
 
   return (

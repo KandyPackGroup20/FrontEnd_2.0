@@ -94,19 +94,28 @@ export default function AssignmentForm({ catalog, onCreated, stores, stationId, 
         <Field label="Truck" id="roster-truck">
           <select id="roster-truck" value={truckId} onChange={(event) => setTruckId(event.target.value)} disabled={submitting} required className="input">
             <option value="">Select truck</option>
-            {catalog.trucks.filter((truck) => truck.is_active).map((truck) => <option key={truck.truck_id} value={truck.truck_id}>{truck.plate_number}</option>)}
+            {(catalog.trucks.filter((truck) => truck.is_active && (!truck.station_id || String(truck.station_id) === stationId)).length > 0
+              ? catalog.trucks.filter((truck) => truck.is_active && (!truck.station_id || String(truck.station_id) === stationId))
+              : catalog.trucks.filter((truck) => truck.is_active)
+            ).map((truck) => <option key={truck.truck_id} value={truck.truck_id}>{truck.plate_number}{truck.station_id ? ` (Station #${truck.station_id})` : ""}</option>)}
           </select>
         </Field>
         <Field label="Driver" id="roster-driver">
           <select id="roster-driver" value={driverId} onChange={(event) => setDriverId(event.target.value)} disabled={submitting} required className="input">
             <option value="">Select driver</option>
-            {catalog.drivers.map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}</option>)}
+            {(catalog.drivers.filter((staff) => !(staff as any).station_id || String((staff as any).station_id) === stationId).length > 0
+              ? catalog.drivers.filter((staff) => !(staff as any).station_id || String((staff as any).station_id) === stationId)
+              : catalog.drivers
+            ).map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}{(staff as any).station_id ? ` (Station #${(staff as any).station_id})` : ""}</option>)}
           </select>
         </Field>
         <Field label="Assistant" id="roster-assistant">
           <select id="roster-assistant" value={assistantId} onChange={(event) => setAssistantId(event.target.value)} disabled={submitting} required className="input">
             <option value="">Select assistant</option>
-            {catalog.assistants.map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}</option>)}
+            {(catalog.assistants.filter((staff) => !(staff as any).station_id || String((staff as any).station_id) === stationId).length > 0
+              ? catalog.assistants.filter((staff) => !(staff as any).station_id || String((staff as any).station_id) === stationId)
+              : catalog.assistants
+            ).map((staff) => <option key={staff.staff_id} value={staff.staff_id}>{staff.name}{(staff as any).station_id ? ` (Station #${(staff as any).station_id})` : ""}</option>)}
           </select>
         </Field>
         <Field label="Start time — Sri Lanka time" id="roster-start-time">

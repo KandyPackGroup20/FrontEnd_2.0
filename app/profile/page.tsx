@@ -30,6 +30,8 @@ interface UserProfile {
   email: string;
   role: string;
   force_password_reset: boolean;
+  station_id?: number | null;
+  station_name?: string | null;
   phone?: string;
   city?: string;
   address_line?: string;
@@ -42,6 +44,8 @@ interface DirectoryUser {
   email: string;
   force_password_reset: boolean;
   is_active: boolean;
+  station_id?: number | null;
+  station_name?: string | null;
   created_at?: string;
 }
 
@@ -71,6 +75,7 @@ function ProfileContent() {
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffEmail, setNewStaffEmail] = useState("");
   const [newStaffRole, setNewStaffRole] = useState("DISPATCHER");
+  const [newStaffStationId, setNewStaffStationId] = useState("3");
   const [newStaffPassword, setNewStaffPassword] = useState("");
   const [licenseNumber, setLicenseNumber] = useState("");
   const [staffLoading, setStaffLoading] = useState(false);
@@ -163,6 +168,7 @@ function ProfileContent() {
           role: newStaffRole,
           password: newStaffPassword,
           license_number: licenseNumber || null,
+          station_id: newStaffStationId ? Number(newStaffStationId) : null,
         }),
       });
 
@@ -675,6 +681,25 @@ function ProfileContent() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-semibold text-text-heading mb-1">
+                    Assigned Regional Hub
+                  </label>
+                  <select
+                    value={newStaffStationId}
+                    onChange={(e) => setNewStaffStationId(e.target.value)}
+                    className="w-full rounded-xl bg-white border border-green-200/80 px-3 py-2 text-xs text-text-heading focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-600"
+                  >
+                    <option value="1">Colombo Fort Goods Shed (#1)</option>
+                    <option value="2">Negombo Regional Depot (#2)</option>
+                    <option value="3">Galle Central Goods Shed (#3)</option>
+                    <option value="4">Matara Southern Goods Shed (#4)</option>
+                    <option value="5">Jaffna Northern Goods Shed (#5)</option>
+                    <option value="6">Trincomalee Eastern Goods Shed (#6)</option>
+                    <option value="7">Kandy Central Hub (#7)</option>
+                  </select>
+                </div>
+
+                <div>
                   <label htmlFor="staff-password" className="block text-xs font-semibold mb-1">Temporary password</label>
                   <input id="staff-password" type="password" required minLength={6} autoComplete="new-password" value={newStaffPassword} onChange={e => setNewStaffPassword(e.target.value)} className="w-full rounded-xl border px-3 py-2" />
                 </div>
@@ -739,6 +764,10 @@ function ProfileContent() {
                       </th>
 
                       <th className="py-2.5 px-4">
+                        Assigned Hub
+                      </th>
+
+                      <th className="py-2.5 px-4">
                         Email
                       </th>
 
@@ -756,7 +785,7 @@ function ProfileContent() {
                     {usersLoading ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={7}
                           className="py-6 text-center text-text-muted"
                         >
                           <Loader2 className="h-5 w-5 animate-spin mx-auto text-green-600" />
@@ -765,7 +794,7 @@ function ProfileContent() {
                     ) : usersList.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={7}
                           className="py-4 text-center text-text-muted"
                         >
                           No users found.
@@ -797,6 +826,10 @@ function ProfileContent() {
                             >
                               {u.role}
                             </span>
+                          </td>
+
+                          <td className="py-2.5 px-4 font-sans text-text-muted text-[11px]">
+                            {u.station_name || (u.station_id ? `Hub #${u.station_id}` : "All Hubs")}
                           </td>
 
                           <td className="py-2.5 px-4 text-text-body">

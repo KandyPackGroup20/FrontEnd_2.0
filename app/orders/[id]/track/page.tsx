@@ -16,6 +16,10 @@ import {
   Calendar,
   Share2,
   Loader2,
+  Check,
+  ShieldCheck,
+  Building2,
+  UserCheck,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
@@ -43,6 +47,14 @@ interface OrderDetails {
   recipient: string;
   amount: number;
   milestones: TrackingMilestone[];
+  raw_status?: string;
+  can_confirm_receipt?: boolean;
+  driver_name?: string | null;
+  driver_phone?: string | null;
+  truck_plate?: string | null;
+  warehouse_bin?: string | null;
+  proof_reference?: string | null;
+  delivered_at?: string | null;
 }
 
 export default function OrderTrackPage() {
@@ -52,79 +64,50 @@ export default function OrderTrackPage() {
   const [copied, setCopied] = useState(false);
   const [orderData, setOrderData] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(false);
+  const [customerNotes, setCustomerNotes] = useState("Package received in excellent condition.");
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/v1/orders/${orderId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setOrderData(data);
+      }
+    } catch (e) {
+      console.error("Failed to load tracking data", e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/v1/orders/${orderId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOrderData(data);
-        }
-      } catch (e) {
-        console.error("Failed to load tracking data", e);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
   }, [orderId]);
 
-  const defaultMilestones: TrackingMilestone[] = [
-    {
-      title: "Order Received & Verified",
-      location: "Kandy Logistics Hub, Peradeniya Rd",
-      time: "Sep 04, 05:15 AM",
-      description: "Freight weighed, inspected, and palletized for rail transit.",
-      completed: true,
-      active: false,
-    },
-    {
-      title: "Loaded onto Freight Carriage",
-      location: "Kandy Railway Goods Yard",
-      time: "Sep 04, 06:10 AM",
-      description: "Cargo loaded onto Sri Lanka Railways Wagon #W-419 (Express 101).",
-      completed: true,
-      active: false,
-    },
-    {
-      title: "In Transit via Main Line Rail",
-      location: "Passing Polgahawela Junction",
-      time: "Sep 04, 08:25 AM",
-      description: "Rail freight progressing on schedule. Speed: 52 km/h.",
-      completed: true,
-      active: true,
-    },
-    {
-      title: "Arrival at Regional Rail Hub",
-      location: "Colombo Fort Goods Shed",
-      time: "Estimated Sep 04, 09:45 AM",
-      description: "Carriage de-coupling and transfer to last-mile dispatch fleet.",
-      completed: false,
-      active: false,
-    },
-    {
-      title: "Out for Last-Mile Truck Delivery",
-      location: "Colombo Metro Distribution",
-      time: "Estimated Sep 04, 11:00 AM",
-      description: "Dispatched via delivery van #WP-CAD-9921 to recipient doorstep.",
-      completed: false,
-      active: false,
-    },
-    {
-      title: "Delivered & Signed",
-      location: "Recipient Destination",
-      time: "Estimated Sep 04, 12:30 PM",
-      description: "Delivery receipt confirmed with digital signature.",
-      completed: false,
-      active: false,
-    },
-  ];
+  async function handleConfirmReceipt() {
+    if (!orderData) return;
+    setConfirming(true);
+    try {
+      const res = await fetch(`/api/v1/orders/${orderData.order_id}/confirm-received`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: customerNotes }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to confirm receipt.");
+      }
+      await loadData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Error confirming receipt.");
+    } finally {
+      setConfirming(false);
+    }
+  }
 
-  const milestones = orderData?.milestones && orderData.milestones.length > 0
-    ? orderData.milestones
-    : defaultMilestones;
+  const milestones = orderData?.milestones || [];
 
   function copyTrackingLink() {
     if (typeof window !== "undefined") {
@@ -133,6 +116,9 @@ export default function OrderTrackPage() {
       setTimeout(() => setCopied(false), 2000);
     }
   }
+
+  const isDelivered = orderData?.raw_status === "DELIVERED" || orderData?.can_confirm_receipt;
+  const isCompleted = orderData?.raw_status === "COMPLETED";
 
   return (
     <div className="relative min-h-screen pb-20 pt-8 px-4 sm:px-6 lg:px-8">
@@ -170,7 +156,7 @@ export default function OrderTrackPage() {
                 <StatusPill status={(orderData?.status as any) || "transit"} />
               </div>
               <p className="text-sm text-text-muted">
-                Kandy Central Goods Shed → {orderData?.destination || "Colombo"} Hub ({orderData?.hubStation || "Colombo Fort Goods Shed"}) → Doorstep
+                Kandy Central Goods Shed → {orderData?.destination || "Colombo"} Hub ({orderData?.hubStation || "Colombo Fort Goods Shed"}) → Doorstep Delivery
               </p>
             </div>
 
@@ -192,22 +178,97 @@ export default function OrderTrackPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 text-sm">
             <div>
               <span className="text-xs text-text-muted block">Estimated Delivery</span>
-              <strong className="text-text-heading font-semibold">{orderData?.date ? `${orderData.date}` : "Today, ~12:30 PM"}</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.date ? `${orderData.date}` : "Scheduled Delivery"}</strong>
             </div>
             <div>
               <span className="text-xs text-text-muted block">Freight Service</span>
-              <strong className="text-text-heading font-semibold">{orderData?.trainSlot || "Rail Express 101"}</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.trainSlot || "Rail Express"}</strong>
             </div>
             <div>
               <span className="text-xs text-text-muted block">Cargo Weight</span>
-              <strong className="text-text-heading font-semibold">{orderData?.weight ? `${orderData.weight}` : "120 kg"}</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.weight ? `${orderData.weight}` : "60 kg"}</strong>
             </div>
             <div>
               <span className="text-xs text-text-muted block">Recipient</span>
-              <strong className="text-text-heading font-semibold">{orderData?.recipient || "Lanka Freight Ltd"}</strong>
+              <strong className="text-text-heading font-semibold">{orderData?.recipient || "Consignee"}</strong>
             </div>
           </div>
         </div>
+
+        {/* Customer Receipt Verification Banner */}
+        {isDelivered && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 rounded-2xl border-2 border-green-500 bg-linear-to-r from-green-50 via-emerald-50 to-green-100/60 p-6 md:p-8 shadow-lg shadow-green-600/10"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-green-900 font-bold text-lg">
+                  <CheckCircle2 className="h-6 w-6 text-green-600 shrink-0" />
+                  <span>Consignment Delivered to Your Doorstep!</span>
+                </div>
+                <p className="text-xs text-green-950/80 leading-relaxed max-w-xl">
+                  Driver <strong>{orderData?.driver_name || "Assigned Driver"}</strong> has completed doorstep handover of your consignment.
+                  {orderData?.proof_reference && (
+                    <span className="block mt-1 font-mono text-[11px] text-green-800">
+                      Proof reference: {orderData.proof_reference}
+                    </span>
+                  )}
+                  Please verify that all parcels arrived in good condition and confirm your receipt below.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+                <input
+                  type="text"
+                  value={customerNotes}
+                  onChange={(e) => setCustomerNotes(e.target.value)}
+                  placeholder="Optional customer feedback note..."
+                  className="rounded-xl border border-green-300 bg-white px-3 py-2 text-xs text-text-heading w-full sm:w-60 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                />
+                <button
+                  onClick={handleConfirmReceipt}
+                  disabled={confirming}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white font-bold py-2.5 px-6 text-xs shadow-md shadow-green-800/20 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {confirming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Confirming...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>Confirm Order Received</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {isCompleted && (
+          <div className="mb-8 rounded-2xl border border-emerald-300 bg-emerald-50/80 p-5 text-xs text-emerald-900 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shrink-0">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <strong className="text-sm font-bold text-emerald-950 block">
+                  Consignment Received & Verified by Recipient
+                </strong>
+                <span className="text-[11px] text-emerald-800">
+                  {orderData?.proof_reference || "Customer signed off delivery."} · Thank you for using Kandypack Logistics!
+                </span>
+              </div>
+            </div>
+            <span className="rounded-full bg-emerald-200/80 text-emerald-950 px-3 py-1 font-bold text-[10px] uppercase tracking-wider">
+              Completed
+            </span>
+          </div>
+        )}
 
         {/* Content Grid: Timeline + Details Card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -286,37 +347,57 @@ export default function OrderTrackPage() {
                   <span className="font-semibold">M10 Diesel Electric</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-muted">Carriage No:</span>
-                  <span className="font-semibold">SLR-CRG-8812</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Dispatched At:</span>
-                  <span className="font-semibold">06:15 AM (Kandy)</span>
+                  <span className="text-text-muted">Freight Service:</span>
+                  <span className="font-semibold">{orderData?.trainSlot || "SLR Freight"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-muted">Hub Destination:</span>
-                  <span className="font-semibold">Colombo Fort (Platform 4)</span>
+                  <span className="font-semibold">{orderData?.destination} Goods Shed</span>
                 </div>
               </div>
             </div>
 
             <div className="glass p-6 rounded-2xl">
               <h3 className="text-sm font-bold text-text-heading uppercase tracking-wider text-green-700 mb-4 flex items-center gap-2">
-                <Truck className="h-4 w-4" /> Road Delivery
+                <Building2 className="h-4 w-4" /> Warehouse & Depot
               </h3>
               <div className="space-y-3 text-xs text-text-body">
                 <div className="flex justify-between">
-                  <span className="text-text-muted">Partner Fleet:</span>
-                  <span className="font-semibold">Kandypack Metro Express</span>
+                  <span className="text-text-muted">Storage Bin:</span>
+                  <span className="font-semibold font-mono text-green-700">
+                    {orderData?.warehouse_bin || "General Inbound Bay"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-muted">Delivery Address:</span>
-                  <span className="font-semibold text-right">No. 12, MacCallum Rd, Colombo 10</span>
+                  <span className="text-text-muted">Regional Depot:</span>
+                  <span className="font-semibold">{orderData?.hubStation || `${orderData?.destination} Central`}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass p-6 rounded-2xl">
+              <h3 className="text-sm font-bold text-text-heading uppercase tracking-wider text-green-700 mb-4 flex items-center gap-2">
+                <Truck className="h-4 w-4" /> Road Delivery Fleet
+              </h3>
+              <div className="space-y-3 text-xs text-text-body">
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Assigned Truck:</span>
+                  <span className="font-semibold">{orderData?.truck_plate || "Road Fleet Scheduled"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-muted">Special Handling:</span>
-                  <span className="font-semibold">Fragile • Dry Goods</span>
+                  <span className="text-text-muted">Driver:</span>
+                  <span className="font-semibold">{orderData?.driver_name || "Regional Driver Assigned"}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Recipient:</span>
+                  <span className="font-semibold text-right">{orderData?.recipient}</span>
+                </div>
+                {orderData?.proof_reference && (
+                  <div className="pt-2 border-t border-surface-glass-border">
+                    <span className="text-text-muted block text-[10px]">Proof / Notes:</span>
+                    <span className="font-mono text-[11px] text-text-heading">{orderData.proof_reference}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -325,7 +406,7 @@ export default function OrderTrackPage() {
                 <AlertCircle className="h-4 w-4" /> Need assistance?
               </div>
               <p className="text-xs text-text-muted mb-3">
-                Our Kandy Operations Desk is available 24/7 for freight inquiries and dispatch updates.
+                Our Operations Desk is available 24/7 for freight inquiries and dispatch updates.
               </p>
               <div className="text-xs font-bold text-green-700">
                 Hotline: +94 81 223 4455
