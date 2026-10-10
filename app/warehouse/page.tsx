@@ -501,8 +501,9 @@ export default function WarehousePage() {
             </label>
             <select
               id="station"
-              className="input"
+              className={`input ${(operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF") ? "opacity-80 bg-slate-100 cursor-not-allowed" : ""}`}
               value={stationId}
+              disabled={operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF"}
               onChange={(e) => handleStationChange(Number(e.target.value))}
             >
               {STATIONS.map((s) => (
@@ -511,6 +512,11 @@ export default function WarehousePage() {
                 </option>
               ))}
             </select>
+            {(operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF") && (
+              <span className="text-[11px] text-text-muted mt-1 block">
+                Assigned station for your account
+              </span>
+            )}
           </div>
         </div>
 

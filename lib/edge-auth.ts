@@ -24,12 +24,14 @@ export async function middleware(request: NextRequest) {
     try {
       // The backend verifies signature, expiry, active status and the current role.
       const result = await fetch(`${backend}/api/v1/auth/me`, {
-        headers: { cookie: `kandypack_session=${token}` }, cache: 'no-store', signal: AbortSignal.timeout(5000),
+        headers: { cookie: `kandypack_session=${token}` }, cache: 'no-store', signal: AbortSignal.timeout(10000),
       });
       if (result.ok) session = await result.json() as Session;
       else if (result.status !== 401 && result.status !== 403) throw new Error('Session service unavailable');
     } catch {
-      return new NextResponse('Session verification is temporarily unavailable. Please retry.', { status: 503 });
+      if (protectedPage) {
+        return new NextResponse('Session verification is temporarily unavailable. Please retry.', { status: 503 });
+      }
     }
   }
   if (protectedPage && !session && pathname !== '/login') {
@@ -48,6 +50,6 @@ export async function middleware(request: NextRequest) {
   ];
   if (session && gates.some(([path, roles]) => within(pathname, path) && !roles.includes(session.role))) return forbidden('Your role cannot access this page.');
   if (session && staffRoles.includes(session.role) && within(pathname, '/order')) return NextResponse.redirect(new URL(home(session.role), request.url));
-  if (session && authPage) return NextResponse.redirect(new URL(home(session.role), request.url));
+  if (session && authPage && !request.nextUrl.searchParams.has('switch')) return NextResponse.redirect(new URL(home(session.role), request.url));
   return NextResponse.next();
 }

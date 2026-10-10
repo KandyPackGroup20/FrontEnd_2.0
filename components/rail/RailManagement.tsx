@@ -28,6 +28,7 @@ import {
   TrendingUp,
   Search,
   Boxes,
+  LogOut,
 } from "lucide-react";
 import GradientBlobs from "@/components/ui/GradientBlobs";
 
@@ -650,6 +651,23 @@ export default function RailManagement({ initialTab = "trips" }: RailManagementP
             >
               <Plus className="h-4 w-4" />
               <span>Create Train Trip</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await fetch("/api/v1/auth/logout", { method: "POST" });
+                } catch {}
+                if (typeof window !== "undefined") {
+                  window.location.href = "/login";
+                }
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold shadow-sm transition-all cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
