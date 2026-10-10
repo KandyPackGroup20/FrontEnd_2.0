@@ -369,8 +369,17 @@ export default function NewOrderPage() {
         }
       } else {
         const data = await res.json().catch(() => null);
-        const detail = data?.detail;
-        throw new Error(typeof detail === "string" ? detail : detail?.message ?? "Order could not be saved. Check the destination details and retry.");
+        let errorMsg = "Order could not be saved. Check the destination details and retry.";
+        if (typeof data?.detail === "string") {
+          errorMsg = data.detail;
+        } else if (typeof data?.detail?.message === "string") {
+          errorMsg = data.detail.message;
+        } else if (Array.isArray(data?.detail) && data.detail[0]) {
+          errorMsg = data.detail.map((e: any) => e.msg || e.message || String(e)).join(", ");
+        } else if (typeof data?.message === "string") {
+          errorMsg = data.message;
+        }
+        throw new Error(errorMsg);
       }
     } catch (error: unknown) {
       setSubmissionError(error instanceof Error ? error.message : "Order could not be saved.");
