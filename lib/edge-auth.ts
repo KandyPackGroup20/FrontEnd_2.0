@@ -47,6 +47,7 @@ export async function middleware(request: NextRequest) {
     ['/warehouse', ['SUPERADMIN', 'LOGISTICS_MGR', 'STORE_MGR', 'WAREHOUSE_STAFF']],
   ];
   if (session && gates.some(([path, roles]) => within(pathname, path) && !roles.includes(session.role))) return forbidden('Your role cannot access this page.');
+  if (session && staffRoles.includes(session.role) && within(pathname, '/order')) return NextResponse.redirect(new URL(home(session.role), request.url));
   if (session && authPage) return NextResponse.redirect(new URL(home(session.role), request.url));
   return NextResponse.next();
 }

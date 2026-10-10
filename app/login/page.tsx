@@ -67,19 +67,19 @@ function Form() {
       setTimeout(() => {
         const role = data?.role as string | undefined;
         if (data?.force_password_reset) {
-          router.push("/profile?force_reset=true");
+          window.location.href = "/profile?force_reset=true";
         } else if (role === "SUPERADMIN") {
-          router.push("/admin/users");
+          window.location.href = "/admin/users";
         } else if (role === "LOGISTICS_MGR") {
-          router.push("/admin/rail");
+          window.location.href = "/admin/rail";
         } else if (role === "DISPATCHER") {
-          router.push("/admin/roster");
+          window.location.href = "/admin/roster";
         } else if (role === "STORE_MGR" || role === "WAREHOUSE_STAFF") {
-          router.push("/warehouse");
-        } else if (role === "SUPERADMIN" || data?.force_password_reset) {
-          router.push("/profile");
+          window.location.href = "/warehouse";
+        } else if (role === "DRIVER" || role === "ASSISTANT") {
+          window.location.href = "/profile";
         } else {
-          router.push(redirectTarget);
+          window.location.href = redirectTarget;
         }
       }, 700);
     } catch (err: unknown) {

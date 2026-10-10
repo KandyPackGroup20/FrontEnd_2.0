@@ -247,6 +247,22 @@ export default function NewOrderPage() {
       }
     }
 
+    async function checkRole() {
+      try {
+        const res = await fetch("/api/v1/auth/me");
+        if (res.ok) {
+          const user = await res.json();
+          if (user?.role && user.role !== "CUSTOMER") {
+            const dest = user.role === "LOGISTICS_MGR" ? "/admin/rail" : user.role === "DISPATCHER" ? "/admin/roster" : user.role === "SUPERADMIN" ? "/admin/users" : "/warehouse";
+            window.location.href = dest;
+          }
+        }
+      } catch {
+        // quiet
+      }
+    }
+
+    checkRole();
     loadCatalogue();
     loadRoutes();
   }, []);

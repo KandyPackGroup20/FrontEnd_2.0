@@ -244,10 +244,17 @@ export default function OrdersPage() {
               unreadCount={unreadCount}
             />
           )}
-          <Button variant="primary" size="sm" href="/order/new">
-            <Plus className="h-4 w-4" />
-            Book Shipment
-          </Button>
+          {isLogisticsStaff ? (
+            <Button variant="primary" size="sm" href="/admin/rail">
+              <Train className="h-4 w-4" />
+              Rail Allocations
+            </Button>
+          ) : (
+            <Button variant="primary" size="sm" href="/order/new">
+              <Plus className="h-4 w-4" />
+              Book Shipment
+            </Button>
+          )}
           <Link
             href="/profile"
             className="text-sm font-medium text-text-muted hover:text-green-600 transition-colors"
@@ -300,10 +307,17 @@ export default function OrdersPage() {
                 Alert History Tab
               </Button>
             )}
-            <Button variant="secondary" size="sm" href="/order/new">
-              <Plus className="h-4 w-4" />
-              New Consignment
-            </Button>
+            {isLogisticsStaff ? (
+              <Button variant="secondary" size="sm" href="/admin/rail">
+                <Train className="h-4 w-4" />
+                Go to Rail Allocation
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" href="/order/new">
+                <Plus className="h-4 w-4" />
+                New Consignment
+              </Button>
+            )}
           </div>
         </div>
 

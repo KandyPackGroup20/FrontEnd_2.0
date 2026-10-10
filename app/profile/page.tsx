@@ -377,20 +377,53 @@ function ProfileContent() {
               </Link>
             )}
 
-          <Link
-            href="/orders"
-            className="text-sm font-semibold text-text-muted hover:text-green-700 transition-colors"
-          >
-            Shipments
-          </Link>
+          {profile?.role === "CUSTOMER" && (
+            <>
+              <Link
+                href="/orders"
+                className="text-sm font-semibold text-text-muted hover:text-green-700 transition-colors"
+              >
+                Shipments
+              </Link>
+              <Button
+                variant="primary"
+                size="sm"
+                href="/order/new"
+              >
+                Book Shipment
+              </Button>
+            </>
+          )}
 
-          <Button
-            variant="primary"
-            size="sm"
-            href="/order/new"
-          >
-            Book Shipment
-          </Button>
+          {profile?.role === "LOGISTICS_MGR" && (
+            <Button
+              variant="primary"
+              size="sm"
+              href="/admin/rail"
+            >
+              Rail Management Portal
+            </Button>
+          )}
+
+          {profile?.role === "DISPATCHER" && (
+            <Button
+              variant="primary"
+              size="sm"
+              href="/admin/roster"
+            >
+              Truck Roster Portal
+            </Button>
+          )}
+
+          {profile?.role && ["STORE_MGR", "WAREHOUSE_STAFF"].includes(profile.role) && (
+            <Button
+              variant="primary"
+              size="sm"
+              href="/warehouse"
+            >
+              Warehouse Inventory
+            </Button>
+          )}
 
           <button
             onClick={handleLogout}
