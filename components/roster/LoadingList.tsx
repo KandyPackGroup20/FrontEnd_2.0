@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Train } from "lucide-react";
 import { assignWholeOrders, getLoadingList } from "@/lib/roster/api";
 import type { CargoOrder, LoadingListData, TruckSchedule } from "@/lib/roster/types";
 
@@ -15,9 +16,23 @@ const reasons: Record<string, string> = {
 
 export function OrderDetails({ order }: { order: CargoOrder }) {
   return <div>
-    <p className="font-semibold">Order #{order.order_id} · {order.customer_name}</p>
-    <p className="mt-1 text-sm">{order.recipient_name} · {order.recipient_phone}</p>
-    <p className="text-sm">{order.delivery_address}</p>
+    <div className="flex items-start justify-between gap-2">
+      <div>
+        <p className="font-semibold">Order #{order.order_id} · {order.customer_name}</p>
+        <p className="mt-1 text-sm">{order.recipient_name} · {order.recipient_phone}</p>
+        <p className="text-sm">{order.delivery_address}</p>
+      </div>
+      {order.trip_id && (
+        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border shrink-0 ${
+          order.manifest_status === "RECEIVED"
+            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+            : "bg-amber-50 text-amber-800 border-amber-300"
+        }`}>
+          <Train className="h-3 w-3" />
+          <span>Train #{order.trip_id}</span>
+        </span>
+      )}
+    </div>
     <p className="mt-1 text-sm text-text-muted">Delivery date: {order.delivery_date} · {order.assigned_weight_kg ?? order.weight_kg} kg</p>
     <ul className="mt-3 space-y-1 text-sm" aria-label={`Order ${order.order_id} products`}>
       {order.items.map((item) => <li key={item.order_item_id}>

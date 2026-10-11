@@ -80,6 +80,27 @@ export interface CargoOrder {
   eligible: boolean;
   blocked_reasons: string[];
   items: CargoItem[];
+  trip_id?: number | null;
+  manifest_status?: string | null;
+  trip_status?: string | null;
+}
+
+export interface IncomingTrainTrip {
+  trip_id: number;
+  origin_station_id: number;
+  origin_city: string;
+  destination_station_id: number;
+  destination_city: string;
+  departure_datetime: string;
+  arrival_datetime: string;
+  total_capacity: number;
+  trip_status: string;
+  manifest_id: number;
+  manifest_status: string;
+  received_at: string | null;
+  allocated_items_count: number;
+  allocated_orders_count: number;
+  total_cargo_weight_kg: number;
 }
 
 export interface TruckSchedule {
