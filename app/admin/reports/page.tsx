@@ -128,7 +128,8 @@ const REPORT_DEFINITIONS: ReportDefinition[] = [
       { key: "delivery_staff_id", label: "Staff ID", align: "center" },
       { key: "staff_name", label: "Staff Member" },
       { key: "staff_role", label: "Role" },
-      { key: "accumulated_hours", label: "Work Hours", align: "right" },
+      { key: "work_week", label: "Year / Week", align: "center" },
+      { key: "accumulated_hours", label: "Scheduled Hours", align: "right" },
       { key: "weekly_cap", label: "Weekly Cap", align: "right" },
       { key: "utilization_pct", label: "Cap %", align: "center" },
       { key: "status_flag", label: "Compliance Status", align: "center" },
@@ -136,7 +137,7 @@ const REPORT_DEFINITIONS: ReportDefinition[] = [
   },
   {
     id: "truck-utilisation",
-    title: "6. Truck Fleet Utilisation & Runs",
+    title: "6. Monthly Truck Utilisation",
     shortTitle: "Truck Fleet",
     category: "Fleet & Operations",
     description: "Operating vehicle fleet efficiency, completed delivery runs, and operational service hours.",
@@ -145,6 +146,8 @@ const REPORT_DEFINITIONS: ReportDefinition[] = [
     columns: [
       { key: "truck_id", label: "Truck ID", align: "center" },
       { key: "plate_number", label: "Plate Number" },
+      { key: "usage_year", label: "Year", align: "center" },
+      { key: "usage_month", label: "Month", align: "center" },
       { key: "total_delivery_runs", label: "Delivery Runs", align: "right" },
       { key: "total_routes", label: "Routes Covered", align: "right" },
       { key: "total_operating_hours", label: "Operating Hours", align: "right" },
@@ -902,7 +905,7 @@ export default function ReportsPage() {
             </div>
           </footer>
         </section>
-      </div>
+        </div>
     </main>
   );
 }
