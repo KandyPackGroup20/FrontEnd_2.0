@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   TrendingUp,
   Award,
@@ -26,6 +27,7 @@ import {
   Database,
   BarChart3,
   X,
+  ArrowLeft,
 } from "lucide-react";
 
 type ReportRow = Record<string, any>;
@@ -256,7 +258,7 @@ function renderCellContent(key: string, value: any) {
     const s = String(value).toUpperCase();
     if (s === "SAFE" || s === "ACCEPTED" || s === "RECEIVED" || s === "COMPLETED") {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
           {s}
         </span>
@@ -264,7 +266,7 @@ function renderCellContent(key: string, value: any) {
     }
     if (s === "WARNING_NEAR_CAP" || s === "PENDING" || s === "IN_TRANSIT" || s === "WARNING") {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-600"></span>
           {s}
         </span>
@@ -272,14 +274,14 @@ function renderCellContent(key: string, value: any) {
     }
     if (s === "CAP_REACHED" || s === "FAILED" || s === "CANCELLED" || s === "CRITICAL") {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+        <span className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
           <span className="h-1.5 w-1.5 rounded-full bg-rose-600"></span>
           {s}
         </span>
       );
     }
     return (
-      <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+      <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700">
         {s}
       </span>
     );
@@ -290,8 +292,8 @@ function renderCellContent(key: string, value: any) {
     const rank = Number(value);
     if (rank === 1) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-100 px-2.5 py-0.5 text-xs font-bold text-amber-900 shadow-sm">
-          🏆 Rank #1
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-100 px-2 py-0.5 text-[11px] font-bold text-amber-900 shadow-sm">
+          🏆 #1
         </span>
       );
     }
@@ -304,7 +306,7 @@ function renderCellContent(key: string, value: any) {
     const isHigh = pct >= 90;
     const isMedium = pct >= 75;
     return (
-      <div className="inline-flex items-center gap-2">
+      <div className="inline-flex items-center gap-1.5">
         <span
           className={`font-semibold ${
             isHigh ? "text-rose-700" : isMedium ? "text-amber-700" : "text-emerald-700"
@@ -312,7 +314,7 @@ function renderCellContent(key: string, value: any) {
         >
           {pct.toFixed(1)}%
         </span>
-        <div className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-1.5 w-10 overflow-hidden rounded-full bg-slate-200">
           <div
             className={`h-full rounded-full ${
               isHigh ? "bg-rose-500" : isMedium ? "bg-amber-500" : "bg-emerald-500"
@@ -507,10 +509,10 @@ export default function ReportsPage() {
 
   if (!authorized && loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-emerald-50/50 to-white">
+      <main className="flex h-screen w-screen items-center justify-center bg-gradient-to-b from-emerald-50/50 to-white">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
-          <p className="text-sm font-semibold text-slate-700">
+          <div className="mx-auto mb-3 h-9 w-9 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
+          <p className="text-xs font-semibold text-slate-700">
             Verifying Superadmin Authorization...
           </p>
         </div>
@@ -521,443 +523,397 @@ export default function ReportsPage() {
   if (!authorized) return null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-50/60 via-slate-50 to-white px-3 pb-8 pt-24 md:px-6 md:pt-28">
-      <div className="mx-auto max-w-[1600px]">
-        {/* Top Header Bar */}
-        <div className="mb-6 flex flex-col justify-between gap-4 border-b border-emerald-100/70 pb-5 md:flex-row md:items-center">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-100/70 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800">
-                <BarChart3 className="h-3.5 w-3.5 text-emerald-700" />
-                Enterprise Analytics
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600 shadow-sm">
-                <Database className="h-3 w-3 text-emerald-600" />
-                MySQL 8.0 (3NF Core)
-              </span>
-            </div>
-            <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
-              Management Reports & Analytics
-            </h1>
-            <p className="text-sm text-slate-600">
-              Interactive operational intelligence, freight capacity, and fleet utilization metrics.
-            </p>
-          </div>
+    <main className="h-screen w-screen overflow-hidden flex flex-col bg-slate-50 text-slate-800 p-2.5 md:p-3.5">
+      {/* Top Header Bar: Clean, Compact, Fits to Screen */}
+      <header className="shrink-0 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-100/80 bg-white/90 px-3.5 py-2 shadow-sm backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/profile"
+            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+            title="Return to User Profile & Navigation"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Profile</span>
+          </Link>
+
+          <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-60"
-              title="Refresh reports data from database"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-emerald-600" : ""}`} />
-              <span>{refreshing ? "Refreshing..." : "Refresh Data"}</span>
-            </button>
-
-            <button
-              onClick={() =>
-                exportToCsv(activeReport.id, activeReport.columns, processedRows)
-              }
-              disabled={processedRows.length === 0}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
-              title="Export current filtered view to CSV file"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>Export CSV</span>
-            </button>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+              <BarChart3 className="h-4 w-4" />
+            </div>
+            <div>
+              <h1 className="text-sm md:text-base font-extrabold tracking-tight text-slate-900 leading-tight">
+                Management Reports & Analytics
+              </h1>
+              <p className="text-[11px] text-slate-500 hidden sm:block leading-none">
+                KandyPack multi-modal logistics intelligence
+              </p>
+            </div>
           </div>
+
+          <span className="hidden md:inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+            <Database className="h-2.5 w-2.5 text-emerald-600" />
+            MySQL 3NF
+          </span>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-700 shadow-sm">
-            {error}
-          </div>
-        )}
+        {/* Action Controls */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
+            title="Reload report data from database"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-emerald-600" : "text-slate-500"}`} />
+            <span className="hidden sm:inline">{refreshing ? "Refreshing..." : "Refresh"}</span>
+          </button>
 
-        {/* Master-Detail Layout: Sidebar + Fit-to-Page Content */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
-          {/* Left Sidebar: Report Navigator */}
-          <aside className="lg:col-span-3 xl:col-span-3">
-            <div className="flex flex-col rounded-2xl border border-emerald-100/80 bg-white/80 p-4 shadow-sm backdrop-blur-md">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  <Layers className="h-3.5 w-3.5 text-emerald-600" />
-                  Report Catalog
+          <button
+            onClick={() => exportToCsv(activeReport.id, activeReport.columns, processedRows)}
+            disabled={processedRows.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40"
+            title="Export current view to CSV spreadsheet"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="shrink-0 mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 shadow-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Main Body: Master-Detail Split with Strict Viewport Containment */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-2.5 md:gap-3 overflow-hidden">
+        {/* Left Sidebar: Compact, Scroll-Free List of Reports */}
+        <aside className="lg:w-64 xl:w-72 shrink-0 flex flex-col h-full rounded-2xl border border-emerald-100/80 bg-white/95 shadow-sm overflow-hidden">
+          {/* Sidebar Top: Search & Header */}
+          <div className="shrink-0 p-2.5 border-b border-slate-100 bg-gradient-to-r from-emerald-50/40 via-white to-white">
+            <div className="flex items-center justify-between mb-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                <Layers className="h-3 w-3 text-emerald-600" />
+                Report Catalog
+              </span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[10px] font-bold text-emerald-800">
+                {REPORT_DEFINITIONS.length} Reports
+              </span>
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Filter catalog..."
+                value={sidebarSearch}
+                onChange={(e) => setSidebarSearch(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50/80 py-1 pl-7 pr-6 text-xs text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+              {sidebarSearch && (
+                <button
+                  onClick={() => setSidebarSearch("")}
+                  className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sidebar Middle: Scrollable Report Items */}
+          <nav
+            className="flex-1 min-h-0 overflow-y-auto p-1.5 space-y-1"
+            aria-label="Management Reports Navigation"
+          >
+            {filteredReportDefs.map((def) => {
+              const Icon = def.icon;
+              const isActive = def.id === activeReportId;
+              const count = reportsData[def.id]?.length ?? 0;
+
+              return (
+                <button
+                  key={def.id}
+                  onClick={() => handleSelectReport(def.id)}
+                  className={`group w-full flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left transition-all ${
+                    isActive
+                      ? "border border-emerald-300 bg-gradient-to-r from-emerald-50 to-emerald-100/50 text-emerald-950 font-bold shadow-xs"
+                      : "border border-transparent hover:border-slate-200 hover:bg-slate-50 text-slate-700 font-medium"
+                  }`}
+                >
+                  <div
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      isActive
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 group-hover:bg-emerald-100 group-hover:text-emerald-700"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className={`truncate text-xs leading-snug ${isActive ? "text-emerald-950 font-bold" : "text-slate-800"}`}>
+                      {def.shortTitle}
+                    </p>
+                    <p className="truncate text-[10px] text-slate-400 leading-none mt-0.5">
+                      {def.category}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`shrink-0 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                      isActive
+                        ? "bg-emerald-200 text-emerald-900"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {filteredReportDefs.length === 0 && (
+              <p className="py-4 text-center text-xs text-slate-400">
+                No matching reports.
+              </p>
+            )}
+          </nav>
+
+          {/* Sidebar Footer */}
+          <div className="shrink-0 p-2 border-t border-slate-100 bg-slate-50/70 text-[10px] text-slate-500 flex items-center justify-between">
+            <span>Storage: MySQL 8.0</span>
+            <span className="font-semibold text-emerald-700">Auto-Paginated</span>
+          </div>
+        </aside>
+
+        {/* Right Main Panel: Contained Table with Internal Scroll and Pagination */}
+        <section className="flex-1 min-w-0 flex flex-col h-full rounded-2xl border border-emerald-100/80 bg-white shadow-sm overflow-hidden">
+          {/* Report Top Header */}
+          <div className="shrink-0 px-4 py-2.5 border-b border-emerald-100/80 bg-gradient-to-r from-emerald-50/50 via-white to-white flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-emerald-100/80 px-2 py-0.2 text-[10px] font-bold text-emerald-800 uppercase tracking-wide">
+                  {activeReport.category}
                 </span>
-                <span className="rounded-md bg-emerald-100/60 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                  {REPORT_DEFINITIONS.length} Reports
+                <span className="text-[11px] text-slate-500">
+                  • {totalRows} {totalRows === 1 ? "Record" : "Records"} Total
                 </span>
               </div>
+              <h2 className="text-base md:text-lg font-bold text-slate-900 truncate">
+                {activeReport.title}
+              </h2>
+            </div>
 
-              {/* Sidebar Search */}
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Filter reports..."
-                  value={sidebarSearch}
-                  onChange={(e) => setSidebarSearch(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-                {sidebarSearch && (
+            {/* Live Search Input */}
+            <div className="relative w-48 sm:w-60 md:w-72">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder={`Search in ${activeReport.shortTitle}...`}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1 pl-8 pr-7 text-xs text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setPage(1);
+                  }}
+                  className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Table Container: strictly scrollable within remaining height */}
+          <div className="flex-1 min-h-0 overflow-auto">
+            {loading ? (
+              <div className="flex h-full min-h-[220px] items-center justify-center">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="h-7 w-7 animate-spin rounded-full border-3 border-emerald-100 border-t-emerald-600" />
+                  <p className="text-xs font-semibold text-slate-500">Loading Report Rows...</p>
+                </div>
+              </div>
+            ) : paginatedRows.length === 0 ? (
+              <div className="flex h-full min-h-[220px] flex-col items-center justify-center p-6 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-2">
+                  <SlidersHorizontal className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-semibold text-slate-700">
+                  {searchQuery
+                    ? `No matching records found for "${searchQuery}"`
+                    : "No data records available in this report"}
+                </p>
+                {searchQuery && (
                   <button
-                    onClick={() => setSidebarSearch("")}
-                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    onClick={() => setSearchQuery("")}
+                    className="mt-2 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                   >
-                    <X className="h-3 w-3" />
+                    Clear Filter
                   </button>
                 )}
               </div>
-
-              {/* Report List */}
-              <nav className="flex flex-col gap-1.5 overflow-y-auto max-h-[calc(100vh-320px)] pr-1" aria-label="Management Reports">
-                {filteredReportDefs.map((def) => {
-                  const Icon = def.icon;
-                  const isActive = def.id === activeReportId;
-                  const count = reportsData[def.id]?.length ?? 0;
-
-                  return (
-                    <button
-                      key={def.id}
-                      onClick={() => handleSelectReport(def.id)}
-                      className={`group flex items-start gap-3 rounded-xl p-2.5 text-left transition-all ${
-                        isActive
-                          ? "border border-emerald-300 bg-gradient-to-r from-emerald-50 via-emerald-100/40 to-white text-emerald-950 shadow-sm"
-                          : "border border-transparent hover:border-emerald-100 hover:bg-emerald-50/40 text-slate-700"
-                      }`}
-                    >
-                      <div
-                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                          isActive
-                            ? "bg-emerald-600 text-white shadow-sm"
-                            : "bg-slate-100 text-slate-600 group-hover:bg-emerald-100 group-hover:text-emerald-700"
-                        }`}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className={`truncate text-xs font-bold ${isActive ? "text-emerald-950" : "text-slate-900"}`}>
-                            {def.shortTitle}
-                          </p>
-                          <span
-                            className={`shrink-0 rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
-                              isActive
-                                ? "bg-emerald-200/80 text-emerald-900 font-bold"
-                                : "bg-slate-100 text-slate-600"
+            ) : (
+              <table className="w-full min-w-[700px] border-collapse text-left text-xs">
+                <thead className="sticky top-0 z-10 border-b border-emerald-100/90 bg-emerald-50 shadow-xs">
+                  <tr>
+                    {activeReport.columns.map((col) => {
+                      const isSorted = sortKey === col.key;
+                      return (
+                        <th
+                          key={col.key}
+                          onClick={() => handleSort(col.key)}
+                          className={`cursor-pointer select-none px-3.5 py-2.5 font-bold text-emerald-950 transition hover:bg-emerald-100/70 ${
+                            col.align === "right"
+                              ? "text-right"
+                              : col.align === "center"
+                              ? "text-center"
+                              : "text-left"
+                          }`}
+                        >
+                          <div
+                            className={`inline-flex items-center gap-1 ${
+                              col.align === "right"
+                                ? "flex-row-reverse"
+                                : col.align === "center"
+                                ? "justify-center"
+                                : ""
                             }`}
                           >
-                            {count}
-                          </span>
-                        </div>
-                        <p className="truncate text-[11px] text-slate-500">
-                          {def.category}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {filteredReportDefs.length === 0 && (
-                  <p className="py-4 text-center text-xs text-slate-400">
-                    No matching reports found.
-                  </p>
-                )}
-              </nav>
-
-              {/* Sidebar Footer Info */}
-              <div className="mt-4 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
-                <div className="flex items-center justify-between">
-                  <span>Engine:</span>
-                  <span className="font-semibold text-slate-700">PyMySQL / Relational</span>
-                </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span>Pagination:</span>
-                  <span className="font-semibold text-emerald-700">Scalable Client/Server</span>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* Right Main Panel: Selected Report Table with Pagination */}
-          <section className="lg:col-span-9 xl:col-span-9">
-            <div className="flex flex-col rounded-2xl border border-emerald-100/90 bg-white shadow-sm">
-              {/* Report Header Bar */}
-              <div className="border-b border-emerald-100/80 bg-gradient-to-r from-emerald-50/70 via-white to-white px-5 py-4">
-                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                        {activeReport.category}
-                      </span>
-                      <span className="text-xs text-slate-400">•</span>
-                      <span className="text-xs font-semibold text-slate-500">
-                        {totalRows} {totalRows === 1 ? "Record" : "Records"} Total
-                      </span>
-                    </div>
-                    <h2 className="mt-1 text-lg font-bold text-slate-900 md:text-xl">
-                      {activeReport.title}
-                    </h2>
-                    <p className="mt-0.5 text-xs text-slate-600">
-                      {activeReport.description}
-                    </p>
-                  </div>
-
-                  {/* Search within Report */}
-                  <div className="relative min-w-[240px] md:min-w-[280px]">
-                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder={`Search in ${activeReport.shortTitle}...`}
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setPage(1);
-                      }}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-sm transition focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => {
-                          setSearchQuery("");
-                          setPage(1);
-                        }}
-                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Fit-to-page Contained Table Body */}
-              <div className="overflow-x-auto overflow-y-auto max-h-[58vh] min-h-[300px]">
-                {loading ? (
-                  <div className="flex h-64 items-center justify-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
-                      <p className="text-xs font-semibold text-slate-500">Loading Report Rows...</p>
-                    </div>
-                  </div>
-                ) : paginatedRows.length === 0 ? (
-                  <div className="flex h-64 flex-col items-center justify-center p-8 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-3">
-                      <SlidersHorizontal className="h-6 w-6" />
-                    </div>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {searchQuery
-                        ? `No matching records found for "${searchQuery}"`
-                        : "No data available in this report"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {searchQuery
-                        ? "Try adjusting your search query or clear the filter."
-                        : "Data will appear once operations generate records."}
-                    </p>
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery("")}
-                        className="mt-3 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                      >
-                        Clear Search Filter
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <table className="w-full min-w-[760px] border-collapse text-left text-xs">
-                    <thead className="sticky top-0 z-10 border-b border-emerald-100/90 bg-emerald-50/90 shadow-sm backdrop-blur-md">
-                      <tr>
-                        {activeReport.columns.map((col) => {
-                          const isSorted = sortKey === col.key;
-                          return (
-                            <th
-                              key={col.key}
-                              onClick={() => handleSort(col.key)}
-                              className={`cursor-pointer select-none px-4 py-3 font-semibold text-emerald-950 transition hover:bg-emerald-100/60 ${
-                                col.align === "right"
-                                  ? "text-right"
-                                  : col.align === "center"
-                                  ? "text-center"
-                                  : "text-left"
-                              }`}
-                            >
-                              <div
-                                className={`inline-flex items-center gap-1.5 ${
-                                  col.align === "right"
-                                    ? "flex-row-reverse"
-                                    : col.align === "center"
-                                    ? "justify-center"
-                                    : ""
-                                }`}
-                              >
-                                <span>{col.label}</span>
-                                {isSorted ? (
-                                  sortDir === "asc" ? (
-                                    <ArrowUp className="h-3 w-3 text-emerald-700" />
-                                  ) : (
-                                    <ArrowDown className="h-3 w-3 text-emerald-700" />
-                                  )
-                                ) : (
-                                  <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100" />
-                                )}
-                              </div>
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {paginatedRows.map((row, idx) => (
-                        <tr
-                          key={idx}
-                          className="transition-colors hover:bg-emerald-50/30 odd:bg-white even:bg-slate-50/40"
+                            <span>{col.label}</span>
+                            {isSorted ? (
+                              sortDir === "asc" ? (
+                                <ArrowUp className="h-3 w-3 text-emerald-700" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3 text-emerald-700" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100" />
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedRows.map((row, idx) => (
+                    <tr
+                      key={idx}
+                      className="transition-colors hover:bg-emerald-50/40 odd:bg-white even:bg-slate-50/40"
+                    >
+                      {activeReport.columns.map((col) => (
+                        <td
+                          key={col.key}
+                          className={`px-3.5 py-2.5 text-slate-700 ${
+                            col.align === "right"
+                              ? "text-right font-mono"
+                              : col.align === "center"
+                              ? "text-center"
+                              : "text-left"
+                          }`}
                         >
-                          {activeReport.columns.map((col) => (
-                            <td
-                              key={col.key}
-                              className={`px-4 py-3.5 text-slate-700 ${
-                                col.align === "right"
-                                  ? "text-right font-mono"
-                                  : col.align === "center"
-                                  ? "text-center"
-                                  : "text-left"
-                              }`}
-                            >
-                              {renderCellContent(col.key, row[col.key])}
-                            </td>
-                          ))}
-                        </tr>
+                          {renderCellContent(col.key, row[col.key])}
+                        </td>
                       ))}
-                    </tbody>
-                  </table>
-                )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Bottom Pagination Footer */}
+          <footer className="shrink-0 px-3.5 py-2 border-t border-slate-100 bg-slate-50/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+            {/* Entry Count Indicator */}
+            <div className="text-slate-500 text-[11px]">
+              {totalRows > 0 ? (
+                <>
+                  Showing <span className="font-bold text-slate-800">{startIndex + 1}</span> to{" "}
+                  <span className="font-bold text-slate-800">{endIndex}</span> of{" "}
+                  <span className="font-bold text-slate-800">{totalRows}</span>
+                  {searchQuery && <span> (filtered)</span>}
+                </>
+              ) : (
+                "0 entries"
+              )}
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center gap-2.5">
+              {/* Rows Per Page */}
+              <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                <span>Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs font-semibold text-slate-700 shadow-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
               </div>
 
-              {/* Scalable Pagination Footer */}
-              <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3 sm:flex-row">
-                {/* Left: Row Counts info */}
-                <div className="text-xs text-slate-600">
-                  {totalRows > 0 ? (
-                    <>
-                      Showing <span className="font-bold text-slate-900">{startIndex + 1}</span> to{" "}
-                      <span className="font-bold text-slate-900">{endIndex}</span> of{" "}
-                      <span className="font-bold text-slate-900">{totalRows}</span> entries
-                      {searchQuery && (
-                        <span className="text-slate-500"> (filtered from {rawRows.length} total)</span>
-                      )}
-                    </>
-                  ) : (
-                    "0 entries"
-                  )}
-                </div>
+              {/* Page Buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(1)}
+                  disabled={currentPage <= 1}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                  title="First Page"
+                >
+                  <ChevronsLeft className="h-3 w-3" />
+                </button>
 
-                {/* Right: Rows per page & Navigation Controls */}
-                <div className="flex flex-wrap items-center gap-3">
-                  {/* Rows per page selector */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <label htmlFor="pageSizeSelect" className="font-medium text-slate-500">
-                      Rows:
-                    </label>
-                    <select
-                      id="pageSizeSelect"
-                      value={pageSize}
-                      onChange={(e) => {
-                        setPageSize(Number(e.target.value));
-                        setPage(1);
-                      }}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value={5}>5</option>
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="h-3 w-3" />
+                </button>
 
-                  {/* Navigation Buttons */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPage(1)}
-                      disabled={currentPage <= 1}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-white"
-                      title="First Page"
-                      aria-label="First page"
-                    >
-                      <ChevronsLeft className="h-3.5 w-3.5" />
-                    </button>
+                <span className="px-1 text-[11px] font-bold text-slate-700">
+                  {currentPage} / {totalPages}
+                </span>
 
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage <= 1}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-white"
-                      title="Previous Page"
-                      aria-label="Previous page"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                  title="Next Page"
+                >
+                  <ChevronRight className="h-3 w-3" />
+                </button>
 
-                    {/* Page Numbers */}
-                    <div className="flex items-center gap-1 px-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter(
-                          (p) =>
-                            p === 1 ||
-                            p === totalPages ||
-                            Math.abs(p - currentPage) <= 1
-                        )
-                        .map((p, idx, arr) => {
-                          const prev = arr[idx - 1];
-                          const showEllipsis = prev && p - prev > 1;
-
-                          return (
-                            <span key={p} className="flex items-center">
-                              {showEllipsis && (
-                                <span className="px-1 text-slate-400">…</span>
-                              )}
-                              <button
-                                onClick={() => setPage(p)}
-                                className={`h-7 min-w-[28px] rounded-lg px-2 text-xs font-bold transition ${
-                                  currentPage === p
-                                    ? "bg-emerald-600 text-white shadow-sm"
-                                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
-                              >
-                                {p}
-                              </button>
-                            </span>
-                          );
-                        })}
-                    </div>
-
-                    <button
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage >= totalPages}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-white"
-                      title="Next Page"
-                      aria-label="Next page"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-
-                    <button
-                      onClick={() => setPage(totalPages)}
-                      disabled={currentPage >= totalPages}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-white"
-                      title="Last Page"
-                      aria-label="Last page"
-                    >
-                      <ChevronsRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={() => setPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-30"
+                  title="Last Page"
+                >
+                  <ChevronsRight className="h-3 w-3" />
+                </button>
               </div>
             </div>
-          </section>
-        </div>
+          </footer>
+        </section>
       </div>
     </main>
   );
