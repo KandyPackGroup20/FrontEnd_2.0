@@ -1,5 +1,5 @@
 import type {
-  CargoOrder, TruckSchedule, StationStore, LoadingListData,
+  CargoOrder, TruckSchedule, StationStore, LoadingListData, IncomingTrainTrip,
   RosterAssignment,
   RosterAssignmentCreated,
   RosterAssignmentRequest,
@@ -99,7 +99,7 @@ function isStaff(value: unknown, type: RosterStaff["staff_type"]): value is Rost
 function isAssignment(value: unknown): value is RosterAssignment {
   return isRecord(value)
     && [value.roster_id, value.route_id, value.truck_id, value.driver_id,
-      value.assistant_id, value.dispatcher_id, value.duration_seconds].every(isId)
+    value.assistant_id, value.dispatcher_id, value.duration_seconds].every(isId)
     && isTimestamp(value.start_time) && isTimestamp(value.end_time)
     && isTimestamp(value.created_at)
     && Date.parse(value.end_time) - Date.parse(value.start_time) === Number(value.duration_seconds) * 1000
@@ -134,16 +134,16 @@ function isNullableText(value: unknown): value is string | null {
 function isAuditAttempt(value: unknown): value is RosterAuditAttempt {
   return isRecord(value) && isId(value.audit_id) && isId(value.actor_id)
     && [value.route_name, value.station_name, value.plate_number, value.driver_name,
-      value.assistant_name].every((label) => label === undefined || isNullableText(label))
+    value.assistant_name].every((label) => label === undefined || isNullableText(label))
     && (value.station_id === undefined || value.station_id === null || isId(value.station_id))
     && isNullableText(value.actor_name) && isTimestamp(value.occurred_at)
     && value.outcome === "ACCEPTED" && value.legacy === false
     && [value.attempted_route_id, value.attempted_truck_id, value.attempted_driver_id,
-      value.attempted_assistant_id, value.assignment_id].every(isId)
+    value.attempted_assistant_id, value.assignment_id].every(isId)
     && isTimestamp(value.attempted_start_time) && isTimestamp(value.attempted_end_time)
     && isNonNegativeInteger(value.attempted_duration_seconds) && value.attempted_duration_seconds > 0
     && Date.parse(value.attempted_end_time) - Date.parse(value.attempted_start_time)
-      === value.attempted_duration_seconds * 1000
+    === value.attempted_duration_seconds * 1000
     && isText(value.request_key) && value.request_key.length <= 128
     && value.policy_id === null && value.reason_code === null;
 }
@@ -405,7 +405,7 @@ function isDecimal(value: unknown): value is string {
 function isCargoOrder(value: unknown): value is CargoOrder {
   if (!isRecord(value) || ![value.order_id, value.route_id, value.station_id].every(isId)
     || ![value.customer_name, value.recipient_name, value.recipient_phone, value.delivery_address,
-      value.route_name, value.station_name, value.order_status].every(isText)
+    value.route_name, value.station_name, value.order_status].every(isText)
     || !isText(value.delivery_date) || !/^\d{4}-\d{2}-\d{2}$/.test(value.delivery_date)
     || !(value.assigned_roster_id === null || isId(value.assigned_roster_id))
     || !(value.delivery_id === null || isId(value.delivery_id))
@@ -423,9 +423,9 @@ function isCargoOrder(value: unknown): value is CargoOrder {
 
 function isTruckSchedule(value: unknown): value is TruckSchedule {
   return isRecord(value) && [value.roster_id, value.route_id, value.station_id,
-    value.truck_id, value.driver_id, value.assistant_id].every(isId)
+  value.truck_id, value.driver_id, value.assistant_id].every(isId)
     && [value.station_name, value.route_name, value.plate_number, value.driver_name,
-      value.assistant_name, value.status].every(isText)
+    value.assistant_name, value.status].every(isText)
     && isTimestamp(value.start_time) && isTimestamp(value.end_time)
     && isDecimal(value.capacity) && isDecimal(value.cargo_weight_kg)
     && (value.capacity_unit === null || value.capacity_unit === "KG")
@@ -476,4 +476,10 @@ export async function assignWholeOrders(rosterId: number, orderIds: number[]): P
     || !Array.isArray(body.order_ids) || body.order_ids.length !== orderIds.length
     || !body.order_ids.every(isId)
     || [...body.order_ids].sort((a, b) => a - b).join(",") !== [...orderIds].sort((a, b) => a - b).join(",")) invalidResponse();
+}
+
+export async function getIncomingTrainTrips(stationId: number, signal?: AbortSignal): Promise<IncomingTrainTrip[]> {
+  const body = await readJson(`/api/v1/roster/train-trips?station_id=${stationId}`, signal ?? new AbortController().signal);
+  if (!isRecord(body) || !Array.isArray(body.trips)) return [];
+  return body.trips as IncomingTrainTrip[];
 }
