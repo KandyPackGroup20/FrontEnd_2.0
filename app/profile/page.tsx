@@ -18,6 +18,10 @@ import {
   Users,
   KeyRound,
   RefreshCw,
+  Truck,
+  ArrowRight,
+  PackageCheck,
+  MapPin,
 } from "lucide-react";
 
 import Button from "@/components/ui/Button";
@@ -428,6 +432,18 @@ function ProfileContent() {
               href="/warehouse"
             >
               Warehouse Inventory
+            </Button>
+          )}
+
+          {profile?.role && ["DRIVER", "ASSISTANT"].includes(profile.role) && (
+            <Button
+              variant="primary"
+              size="sm"
+              href="/driver"
+              className="flex items-center gap-1.5"
+            >
+              <Truck className="h-3.5 w-3.5" />
+              <span>Driver Delivery Runs</span>
             </Button>
           )}
 
@@ -860,6 +876,182 @@ function ProfileContent() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ================================================================ */}
+        {/* OPERATIONAL ROLE ACTION DASHBOARD CARDS */}
+        {/* ================================================================ */}
+
+        {/* DRIVER / ASSISTANT ROAD DISPATCH CARD */}
+        {profile?.role && ["DRIVER", "ASSISTANT"].includes(profile.role) && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 rounded-3xl card-glass p-6 sm:p-8 shadow-glass border border-emerald-300/80 bg-gradient-to-br from-emerald-500/15 via-white/85 to-green-500/10 relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2.5 max-w-2xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <Truck className="h-3.5 w-3.5 text-emerald-700" />
+                    Road Dispatch & Field Crew
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/90 text-text-muted border border-green-200">
+                    <MapPin className="h-3 w-3 text-green-600" />
+                    {profile.station_name || (profile.station_id ? `Station Hub #${profile.station_id}` : "Regional Fleet")}
+                  </span>
+                </div>
+
+                <h2 className="text-2xl font-bold tracking-tight text-text-heading">
+                  Active Driver Delivery Runs & Customer Stops
+                </h2>
+                <p className="text-sm text-text-muted leading-relaxed">
+                  You are registered as field delivery crew. Access your scheduled truck runs, customer stop addresses, recipient phone contacts, and confirm doorstep deliveries with digital hand-off notes.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  href="/driver"
+                  className="shadow-lg shadow-green-600/25 flex items-center justify-center gap-2 font-bold px-6 py-3"
+                >
+                  <Truck className="h-4 w-4" />
+                  <span>Open Driver Portal</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  href="/orders"
+                  className="text-xs flex items-center justify-center"
+                >
+                  Browse Shipments
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* DISPATCHER ROAD ROSTER CARD */}
+        {profile?.role === "DISPATCHER" && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 rounded-3xl card-glass p-6 sm:p-8 shadow-glass border border-emerald-300/80 bg-gradient-to-br from-emerald-500/15 via-white/85 to-green-500/10 relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2.5 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <Truck className="h-3.5 w-3.5 text-emerald-700" />
+                    Hub Dispatch Operations
+                  </span>
+                </div>
+
+                <h2 className="text-2xl font-bold tracking-tight text-text-heading">
+                  Truck Roster & Local Delivery Scheduling
+                </h2>
+                <p className="text-sm text-text-muted leading-relaxed">
+                  Schedule road vehicles, assign regional drivers and assistants, and dispatch customer orders from your regional depot.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  href="/admin/roster"
+                  className="shadow-lg shadow-green-600/25 flex items-center justify-center gap-2 font-bold px-6 py-3"
+                >
+                  <Truck className="h-4 w-4" />
+                  <span>Open Truck Roster</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* WAREHOUSE STAFF / STORE MGR CARD */}
+        {profile?.role && ["STORE_MGR", "WAREHOUSE_STAFF"].includes(profile.role) && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 rounded-3xl card-glass p-6 sm:p-8 shadow-glass border border-emerald-300/80 bg-gradient-to-br from-emerald-500/15 via-white/85 to-green-500/10 relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2.5 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <PackageCheck className="h-3.5 w-3.5 text-emerald-700" />
+                    Warehouse Inventory
+                  </span>
+                </div>
+
+                <h2 className="text-2xl font-bold tracking-tight text-text-heading">
+                  Station Warehouse & Inventory Bins
+                </h2>
+                <p className="text-sm text-text-muted leading-relaxed">
+                  Receive arriving train freight manifests, allocate items to storage bays and bins, and hand over consignments to regional dispatchers.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  href="/warehouse"
+                  className="shadow-lg shadow-green-600/25 flex items-center justify-center gap-2 font-bold px-6 py-3"
+                >
+                  <PackageCheck className="h-4 w-4" />
+                  <span>Open Warehouse Portal</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* LOGISTICS MANAGER RAIL CARD */}
+        {profile?.role === "LOGISTICS_MGR" && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 rounded-3xl card-glass p-6 sm:p-8 shadow-glass border border-emerald-300/80 bg-gradient-to-br from-emerald-500/15 via-white/85 to-green-500/10 relative overflow-hidden"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2.5 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <Train className="h-3.5 w-3.5 text-emerald-700" />
+                    Freight Rail Operations
+                  </span>
+                </div>
+
+                <h2 className="text-2xl font-bold tracking-tight text-text-heading">
+                  Inter-Hub Train Capacity & Freight Schedules
+                </h2>
+                <p className="text-sm text-text-muted leading-relaxed">
+                  Manage railway routes, daily train departure schedules, boxcar capacity allocations, and rail dispatch manifests across Sri Lanka.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  href="/admin/rail"
+                  className="shadow-lg shadow-green-600/25 flex items-center justify-center gap-2 font-bold px-6 py-3"
+                >
+                  <Train className="h-4 w-4" />
+                  <span>Open Rail Portal</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </motion.div>

@@ -77,7 +77,7 @@ function Form() {
         } else if (role === "STORE_MGR" || role === "WAREHOUSE_STAFF") {
           window.location.href = "/warehouse";
         } else if (role === "DRIVER" || role === "ASSISTANT") {
-          window.location.href = "/profile";
+          window.location.href = "/driver";
         } else {
           window.location.href = redirectTarget;
         }

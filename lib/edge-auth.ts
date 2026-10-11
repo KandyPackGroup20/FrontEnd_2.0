@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 type Session = { user_id: number; role: string; force_password_reset: boolean };
 const backend = (process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://backend-bzhp.onrender.com' : 'http://127.0.0.1:8000')).replace(/\/+$/, '');
 const staffRoles = ['SUPERADMIN', 'LOGISTICS_MGR', 'DISPATCHER', 'STORE_MGR', 'WAREHOUSE_STAFF', 'DRIVER', 'ASSISTANT'];
-const home = (role: string) => ({ SUPERADMIN: '/admin/users', LOGISTICS_MGR: '/admin/rail', DISPATCHER: '/admin/roster', STORE_MGR: '/warehouse', WAREHOUSE_STAFF: '/warehouse', DRIVER: '/profile', ASSISTANT: '/profile' }[role] || '/orders');
+const home = (role: string) => ({ SUPERADMIN: '/admin/users', LOGISTICS_MGR: '/admin/rail', DISPATCHER: '/admin/roster', STORE_MGR: '/warehouse', WAREHOUSE_STAFF: '/warehouse', DRIVER: '/driver', ASSISTANT: '/driver' }[role] || '/orders');
 const within = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
 
 function forbidden(message: string) {
@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
   const adminHost = request.nextUrl.hostname.toLowerCase().startsWith('admin.');
   const adminPath = within(pathname, '/admin');
   const authPage = pathname === '/login' || pathname === '/register';
-  const protectedPage = adminHost || adminPath || ['/orders', '/order', '/profile', '/warehouse'].some(p => within(pathname, p));
+  const protectedPage = adminHost || adminPath || ['/orders', '/order', '/profile', '/warehouse', '/driver'].some(p => within(pathname, p));
   if (adminHost && pathname === '/register') return forbidden('Registration is available on the customer website only.');
   let session: Session | null = null;
   const token = request.cookies.get('kandypack_session')?.value;
@@ -62,6 +62,7 @@ export async function middleware(request: NextRequest) {
     ['/admin/roster', ['SUPERADMIN', 'LOGISTICS_MGR', 'DISPATCHER']],
     ['/admin/reports', ['SUPERADMIN']],
     ['/warehouse', ['SUPERADMIN', 'LOGISTICS_MGR', 'STORE_MGR', 'WAREHOUSE_STAFF']],
+    ['/driver', ['SUPERADMIN', 'LOGISTICS_MGR', 'DISPATCHER', 'DRIVER', 'ASSISTANT']],
   ];
   if (session && gates.some(([path, roles]) => within(pathname, path) && !roles.includes(session.role))) return forbidden('Your role cannot access this page.');
   if (session && staffRoles.includes(session.role) && within(pathname, '/order')) return NextResponse.redirect(new URL(home(session.role), request.url));

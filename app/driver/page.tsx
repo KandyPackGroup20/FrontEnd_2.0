@@ -17,6 +17,8 @@ import {
   FileText,
   Calendar,
   User,
+  LogOut,
+  Train,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
@@ -96,6 +98,17 @@ export default function DriverPortalPage() {
     }
   }
 
+  async function handleLogout() {
+    try {
+      await fetch("/api/v1/auth/logout", {
+        method: "POST",
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    window.location.href = "/login";
+  }
+
   const pendingStops = deliveries.filter((d) => d.delivery_status !== "DELIVERED");
   const completedStops = deliveries.filter((d) => d.delivery_status === "DELIVERED");
   const displayStops = activeTab === "pending" ? pendingStops : completedStops;
@@ -103,6 +116,46 @@ export default function DriverPortalPage() {
   return (
     <div className="relative min-h-screen pb-20 pt-8 px-4 sm:px-6 lg:px-8">
       <GradientBlobs />
+
+      {/* Top Bar Navigation */}
+      <div className="mx-auto max-w-6xl mb-6 flex items-center justify-between">
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 text-text-heading no-underline group"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-white shadow-md shadow-green-600/20 group-hover:scale-105 transition-transform">
+            <Train className="h-5 w-5" />
+          </div>
+          <span className="text-xl font-bold tracking-tight">
+            Kandypack
+          </span>
+        </Link>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/profile"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-green-700 transition-colors px-3 py-1.5 rounded-xl border border-transparent hover:border-green-200"
+          >
+            <User className="h-3.5 w-3.5" />
+            <span>Profile & Account</span>
+          </Link>
+
+          <Link
+            href="/orders"
+            className="hidden sm:inline-flex items-center text-xs font-semibold text-text-muted hover:text-green-700 transition-colors px-3 py-1.5 rounded-xl"
+          >
+            Browse Shipments
+          </Link>
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200/80 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sign Out
+          </button>
+        </div>
+      </div>
 
       <div className="mx-auto max-w-6xl">
         {/* Header */}
@@ -135,9 +188,6 @@ export default function DriverPortalPage() {
               >
                 Refresh Runs
               </button>
-              <Link href="/orders" className="btn-secondary px-4 py-2 text-xs">
-                All Orders
-              </Link>
             </div>
           </div>
 
@@ -154,13 +204,13 @@ export default function DriverPortalPage() {
             <div>
               <span className="text-text-muted block">Active Truck Plate</span>
               <strong className="text-sm font-bold text-text-heading">
-                {deliveries[0]?.truck_plate || "SP-CAB-2001"}
+                {deliveries[0]?.truck_plate || "Assigned on Dispatch"}
               </strong>
             </div>
             <div>
               <span className="text-text-muted block">Depot Hub</span>
               <strong className="text-sm font-bold text-text-heading">
-                {deliveries[0]?.station_name || "Galle Regional Hub"}
+                {deliveries[0]?.station_name || "Regional Hub Depot"}
               </strong>
             </div>
           </div>
