@@ -24,7 +24,6 @@ import {
   ArrowUp,
   ArrowDown,
   Layers,
-  Database,
   BarChart3,
   X,
   ArrowLeft,
@@ -539,23 +538,18 @@ export default function ReportsPage() {
           <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-              <BarChart3 className="h-4 w-4" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-xs">
+              <BarChart3 className="h-3.5 w-3.5" />
             </div>
             <div>
-              <h1 className="text-sm md:text-base font-extrabold tracking-tight text-slate-900 leading-tight">
+              <h1 className="text-xs md:text-sm font-bold tracking-tight text-slate-900 leading-tight">
                 Management Reports & Analytics
               </h1>
-              <p className="text-[11px] text-slate-500 hidden sm:block leading-none">
-                KandyPack multi-modal logistics intelligence
+              <p className="text-[10px] text-slate-500 hidden sm:block leading-none mt-0.5">
+                Executive supply chain intelligence
               </p>
             </div>
           </div>
-
-          <span className="hidden md:inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
-            <Database className="h-2.5 w-2.5 text-emerald-600" />
-            MySQL 3NF
-          </span>
         </div>
 
         {/* Action Controls */}
@@ -682,18 +676,12 @@ export default function ReportsPage() {
               </p>
             )}
           </nav>
-
-          {/* Sidebar Footer */}
-          <div className="shrink-0 p-2 border-t border-slate-100 bg-slate-50/70 text-[10px] text-slate-500 flex items-center justify-between">
-            <span>Storage: MySQL 8.0</span>
-            <span className="font-semibold text-emerald-700">Auto-Paginated</span>
-          </div>
         </aside>
 
         {/* Right Main Panel: Contained Table with Internal Scroll and Pagination */}
         <section className="flex-1 min-w-0 flex flex-col h-full rounded-2xl border border-emerald-100/80 bg-white shadow-sm overflow-hidden">
           {/* Report Top Header */}
-          <div className="shrink-0 px-4 py-2.5 border-b border-emerald-100/80 bg-gradient-to-r from-emerald-50/50 via-white to-white flex flex-wrap items-center justify-between gap-2">
+          <div className="shrink-0 px-4 py-2 border-b border-emerald-100/80 bg-gradient-to-r from-emerald-50/50 via-white to-white flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-emerald-100/80 px-2 py-0.2 text-[10px] font-bold text-emerald-800 uppercase tracking-wide">
@@ -703,7 +691,7 @@ export default function ReportsPage() {
                   • {totalRows} {totalRows === 1 ? "Record" : "Records"} Total
                 </span>
               </div>
-              <h2 className="text-base md:text-lg font-bold text-slate-900 truncate">
+              <h2 className="text-sm md:text-base font-bold text-slate-900 truncate mt-0.5">
                 {activeReport.title}
               </h2>
             </div>
