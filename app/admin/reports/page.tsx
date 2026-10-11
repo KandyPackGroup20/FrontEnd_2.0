@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-type ReportRow = Record<string, any>;
+type ReportRow = Record<string, ReactNode>;
 
 type Column = {
   key: string;
@@ -71,7 +71,7 @@ function ReportTable({
   );
 }
 
-function getFirstArray(data: any): ReportRow[] {
+function getFirstArray(data: unknown): ReportRow[] {
   if (Array.isArray(data)) {
     return data;
   }
@@ -276,7 +276,8 @@ export default function ReportsPage() {
                 { key: "delivery_staff_id", label: "Staff ID" },
                 { key: "staff_name", label: "Staff Member" },
                 { key: "staff_role", label: "Role" },
-                { key: "accumulated_hours", label: "Work Hours" },
+                { key: "work_week", label: "Year / Week" },
+                { key: "accumulated_hours", label: "Scheduled Hours" },
                 { key: "weekly_cap", label: "Hour Cap" },
                 { key: "utilization_pct", label: "Utilisation %" },
                 { key: "status_flag", label: "Status" },
@@ -284,11 +285,13 @@ export default function ReportsPage() {
             />
 
             <ReportTable
-              title="5. Truck Utilisation"
+              title="5. Monthly Truck Utilisation"
               rows={truckUtilisation}
               columns={[
                 { key: "truck_id", label: "Truck ID" },
                 { key: "plate_number", label: "Plate Number" },
+                { key: "usage_year", label: "Year" },
+                { key: "usage_month", label: "Month" },
                 { key: "total_delivery_runs", label: "Delivery Runs" },
                 { key: "total_routes", label: "Routes" },
                 {
