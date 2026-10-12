@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { Train, AlertCircle, Mail, Lock, Loader2, ArrowRight } from "lucide-react";
+import { Train, AlertCircle, Mail, Lock, Loader2, ArrowRight, ShieldCheck, RefreshCw, ArrowLeft } from "lucide-react";
 import { setAuthToken } from "@/lib/api";
 
 function Form() {
@@ -15,16 +15,26 @@ function Form() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
+  const [otpCode, setOtpCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendNotice, setResendNotice] = useState("");
   const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setResendNotice("");
 
     if (!email || !password) {
       setError("Please fill in all fields.");
+      return;
+    }
+
+    if (step === "otp" && !otpCode.trim()) {
+      setError("Please enter the 6-digit verification code sent to your email.");
       return;
     }
 
@@ -44,6 +54,7 @@ function Form() {
           email: cleanEmail,
           password: password,
           portal_type: portalType,
+          ...(step === "otp" ? { otp_code: otpCode.trim() } : {}),
         }),
       });
 
@@ -58,6 +69,13 @@ function Form() {
         throw new Error(
           (data?.detail as string) || "Login failed. Please verify your credentials."
         );
+      }
+
+      // If customer requires OTP verification, transition to OTP entry step
+      if (data?.require_otp) {
+        setStep("otp");
+        setLoading(false);
+        return;
       }
 
       // Discard legacy browser-readable tokens; authentication uses the HttpOnly cookie.
@@ -91,6 +109,28 @@ function Form() {
     }
   }
 
+  async function handleResendOtp() {
+    setError("");
+    setResendNotice("");
+    setResending(true);
+    try {
+      const res = await fetch("/api/v1/auth/resend-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to resend code.");
+      }
+      setResendNotice("A fresh 6-digit code was dispatched to your email!");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not resend code.");
+    } finally {
+      setResending(false);
+    }
+  }
+
   return (
     <div
       className="relative flex min-h-screen items-center justify-center px-4 sm:px-6 py-16 bg-cover bg-center bg-no-repeat"
@@ -121,10 +161,12 @@ function Form() {
           className="mb-2 text-center text-2xl md:text-3xl font-bold text-white drop-shadow-sm"
           style={{ color: "#FFFFFF" }}
         >
-          Welcome back
+          {step === "otp" ? "Verify your email" : "Welcome back"}
         </h1>
         <p className="mb-6 text-center text-sm text-green-100/80">
-          Sign in to access your portal
+          {step === "otp"
+            ? `Enter the 6-digit code sent to ${email}`
+            : "Sign in to access your portal"}
         </p>
 
         {success ? (
@@ -133,9 +175,107 @@ function Form() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <p className="font-semibold text-green-300 text-lg"> successful!</p>
+            <p className="font-semibold text-green-300 text-lg">Login successful!</p>
             <p className="mt-1 text-sm text-green-100/80">Redirecting to your dashboard...</p>
           </motion.div>
+        ) : step === "otp" ? (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2.5 rounded-xl bg-red-950/60 border border-red-500/30 p-3 text-xs text-red-200"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                <span>{error}</span>
+              </motion.div>
+            )}
+
+            {resendNotice && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2.5 rounded-xl bg-green-950/60 border border-green-500/30 p-3 text-xs text-green-200"
+              >
+                <ShieldCheck className="h-4 w-4 shrink-0 text-green-400 mt-0.5" />
+                <span>{resendNotice}</span>
+              </motion.div>
+            )}
+
+            {/* OTP Code */}
+            <div>
+              <label
+                htmlFor="otp-code-input"
+                className="block mb-2 text-xs font-semibold uppercase tracking-wider text-green-100/90 text-center"
+              >
+                6-Digit Email Verification Code
+              </label>
+              <div className="relative">
+                <input
+                  id="otp-code-input"
+                  type="text"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="••••••"
+                  className="w-full text-center tracking-[0.5em] font-mono text-2xl font-bold rounded-xl bg-white/10 border border-white/20 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400 transition-all backdrop-blur-sm"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  required
+                />
+              </div>
+              <p className="mt-2 text-center text-xs text-green-100/60">
+                Check your inbox (or spam) for your one-time verification code.
+              </p>
+            </div>
+
+            {/* Submit OTP */}
+            <button
+              id="verify-otp-btn"
+              type="submit"
+              disabled={loading || otpCode.length < 6}
+              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.98] text-white font-semibold py-3 px-4 shadow-lg shadow-green-900/40 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verifying code...
+                </>
+              ) : (
+                <>
+                  Verify & Sign in
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+
+            {/* Secondary actions: resend and change email */}
+            <div className="flex items-center justify-between pt-2 text-xs text-green-100/80">
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={resending}
+                className="inline-flex items-center gap-1 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${resending ? "animate-spin" : ""}`} />
+                <span>Resend Code</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("credentials");
+                  setOtpCode("");
+                  setError("");
+                  setResendNotice("");
+                }}
+                className="inline-flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                <span>Use another account</span>
+              </button>
+            </div>
+          </form>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {error && (
