@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { Mail, Lock, User, Phone, MapPin, Building, ArrowRight, Train, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, User, Phone, MapPin, Building, ArrowRight, Train, Loader2, AlertCircle, ShieldCheck, RefreshCw, ArrowLeft } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [step, setStep] = useState<"form" | "otp">("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -16,13 +17,17 @@ export default function RegisterPage() {
   const [postalCode, setPostalCode] = useState("00100");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendNotice, setResendNotice] = useState("");
   const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setResendNotice("");
 
     if (!name || !email || !phone || !addressLine || !city || !password || !confirm) {
       setError("Please fill in all required fields.");
@@ -51,7 +56,7 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           name,
-          email,
+          email: email.trim(),
           phone,
           address_line: addressLine,
           city,
@@ -71,6 +76,12 @@ export default function RegisterPage() {
         throw new Error((data?.detail as string) || "Registration failed. Please make sure the FastAPI backend is running on port 8000.");
       }
 
+      if (data?.require_otp) {
+        setStep("otp");
+        setLoading(false);
+        return;
+      }
+
       setSuccess(true);
       setTimeout(() => {
         router.push("/orders");
@@ -80,6 +91,76 @@ export default function RegisterPage() {
       setError(message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setResendNotice("");
+
+    if (!otpCode.trim()) {
+      setError("Please enter the 6-digit verification code sent to your email.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/v1/auth/verify-otp", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          otp_code: otpCode.trim(),
+        }),
+      });
+
+      let data: Record<string, unknown> | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Plain text fallback
+      }
+
+      if (!res.ok) {
+        throw new Error((data?.detail as string) || "Verification failed. Please check the code and try again.");
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        router.push("/orders");
+      }, 1000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not verify code.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendOtp() {
+    setError("");
+    setResendNotice("");
+    setResending(true);
+    try {
+      const res = await fetch("/api/v1/auth/resend-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to resend code.");
+      }
+      setResendNotice("A fresh 6-digit verification code has been dispatched to your email!");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not resend code.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -113,10 +194,12 @@ export default function RegisterPage() {
           className="mb-2 text-center text-2xl md:text-3xl font-bold text-white drop-shadow-sm"
           style={{ color: "#FFFFFF" }}
         >
-          Create Customer Account
+          {step === "otp" ? "Verify Your Email" : "Create Customer Account"}
         </h1>
         <p className="mb-6 text-center text-sm text-green-100/80">
-          Sign up to manage and track multi-modal freight shipments
+          {step === "otp"
+            ? `Enter the 6-digit verification code dispatched to ${email}`
+            : "Sign up to manage and track multi-modal freight shipments"}
         </p>
 
         {success ? (
@@ -125,12 +208,103 @@ export default function RegisterPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <p className="font-semibold text-green-300 text-lg">Account created successfully!</p>
+            <p className="font-semibold text-green-300 text-lg">Email Verified Successfully!</p>
             <p className="mt-1 text-sm text-green-100/90">
               Welcome to Kandypack! Redirecting to your dashboard...
             </p>
           </motion.div>
+        ) : step === "otp" ? (
+          /* Step 2: Email Verification OTP Form */
+          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2.5 rounded-xl bg-red-950/60 border border-red-500/30 p-3 text-xs text-red-200"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                <span>{error}</span>
+              </motion.div>
+            )}
+
+            {resendNotice && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 p-3 text-xs text-emerald-200"
+              >
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                <span>{resendNotice}</span>
+              </motion.div>
+            )}
+
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-center">
+              <label htmlFor="reg-otp-code" className="block text-xs font-semibold uppercase tracking-wider text-green-200/90 mb-2">
+                6-Digit Verification Code
+              </label>
+              <input
+                id="reg-otp-code"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="••••••"
+                className="w-full text-center text-3xl font-extrabold tracking-[10px] rounded-xl bg-white/10 border border-white/20 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400 transition-all font-mono"
+                required
+                autoFocus
+              />
+              <p className="mt-2 text-[11px] text-white/60">
+                Code expires in 10 minutes. Check your inbox & spam folder.
+              </p>
+            </div>
+
+            <button
+              id="verify-otp-submit-btn"
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.98] text-white font-semibold py-3 px-4 shadow-lg shadow-green-900/40 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  Verify & Activate Account
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+
+            <div className="flex items-center justify-between text-xs text-white/70 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={resending}
+                className="inline-flex items-center gap-1.5 text-green-300 hover:text-green-200 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`h-3 w-3 ${resending ? "animate-spin" : ""}`} />
+                <span>Resend Code</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("form");
+                  setError("");
+                  setResendNotice("");
+                }}
+                className="inline-flex items-center gap-1 text-white/60 hover:text-white transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                <span>Edit Details</span>
+              </button>
+            </div>
+          </form>
         ) : (
+          /* Step 1: Initial Registration Form */
           <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
             {error && (
               <motion.div
@@ -293,11 +467,11 @@ export default function RegisterPage() {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating Account...
+                  Creating Account & Sending Code...
                 </>
               ) : (
                 <>
-                  Register & Continue
+                  Register & Verify Email
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -308,7 +482,7 @@ export default function RegisterPage() {
         <div className="mt-6 text-center text-xs text-white/70">
           Already have an account?{" "}
           <Link
-            href="/"
+            href="/login"
             className="font-semibold text-green-300 hover:text-green-200 transition-colors underline underline-offset-4"
           >
             Sign in
@@ -318,3 +492,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+
