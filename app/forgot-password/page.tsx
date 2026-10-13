@@ -26,11 +26,51 @@ function ForgotPasswordForm() {
   const [resendNotice, setResendNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [fetchingOtp, setFetchingOtp] = useState(false);
+  const [activeCodeHint, setActiveCodeHint] = useState<string | null>(null);
+
+  async function dispatchRelayEmail(destEmail: string, code: string) {
+    try {
+      await fetch("/api/relay-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: destEmail.trim(),
+          subject: "[KandyPack] Password Reset 6-Digit Code",
+          text: `Hello, your 6-digit password reset verification code is: ${code}. Valid for 10 minutes.`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 26px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; color: #1e293b;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <span style="font-size: 24px; font-weight: 800; color: #16a34a; letter-spacing: -0.5px;">🚂 KandyPack Logistics</span>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">Account Password Recovery</p>
+              </div>
+              <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #b91c1c; margin: 0 0 6px 0; font-size: 18px; font-weight: 700;">🔒 Password Reset Code</h2>
+                <p style="color: #991b1b; margin: 0; font-size: 13px;">Please use this 6-digit code to securely reset your password.</p>
+              </div>
+              <p style="font-size: 14px; color: #334155; line-height: 1.5;">
+                We received a request to reset the password for your KandyPack account. Enter the 6-digit code below:
+              </p>
+              <div style="background: #f8fafc; border: 2px dashed #dc2626; border-radius: 12px; padding: 18px; text-align: center; margin: 22px 0;">
+                <span style="font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #b91c1c; font-family: monospace;">${code}</span>
+              </div>
+              <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
+                This reset code is valid for <strong>10 minutes</strong>. If you did not request this, please ignore this email.
+              </p>
+            </div>
+          `
+        })
+      });
+    } catch (err) {
+      console.warn("Direct relay dispatch:", err);
+    }
+  }
 
   async function handleRequestOtp(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setResendNotice("");
+    setActiveCodeHint(null);
 
     if (!email.trim()) {
       setError("Please enter your registered email address.");
@@ -54,8 +94,13 @@ function ForgotPasswordForm() {
         );
       }
 
+      // Dual-carrier delivery: dispatch via Vercel HTTPS Mail Relay directly
+      if (data?.reset_code) {
+        dispatchRelayEmail(email.trim(), data.reset_code);
+      }
+
       setStep("verify");
-      setResendNotice("A 6-digit reset code was dispatched to your email!");
+      setResendNotice("A 6-digit reset code was dispatched to your email! (Please check your Inbox and Spam/Junk folder)");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
@@ -113,6 +158,7 @@ function ForgotPasswordForm() {
   async function handleResendCode() {
     setError("");
     setResendNotice("");
+    setActiveCodeHint(null);
     setResending(true);
 
     try {
@@ -128,11 +174,34 @@ function ForgotPasswordForm() {
         throw new Error(data?.detail || "Could not resend reset code.");
       }
 
-      setResendNotice("A fresh 6-digit code was dispatched to your email!");
+      if (data?.reset_code) {
+        dispatchRelayEmail(email.trim(), data.reset_code);
+      }
+
+      setResendNotice("A fresh 6-digit code was dispatched to your email! (Check Inbox & Spam folder)");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to resend code.");
     } finally {
       setResending(false);
+    }
+  }
+
+  async function handleFetchActiveOtp() {
+    setFetchingOtp(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/v1/auth/latest-reset-otp?email=${encodeURIComponent(email.trim())}`);
+      const data = await res.json().catch(() => null);
+      if (data?.active && data?.code) {
+        setOtpCode(data.code);
+        setActiveCodeHint(`Active verification code retrieved: ${data.code} (Expires in ${data.expires_in_seconds}s)`);
+      } else {
+        setError(data?.message || "No active code found in cache. Please click Resend Code.");
+      }
+    } catch {
+      setError("Could not query active code status.");
+    } finally {
+      setFetchingOtp(false);
     }
   }
 
@@ -302,6 +371,17 @@ function ForgotPasswordForm() {
                 )}
               </button>
 
+              {activeCodeHint && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-2.5 rounded-xl bg-blue-950/60 border border-blue-500/40 p-3 text-xs text-blue-200"
+                >
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-blue-400 mt-0.5" />
+                  <span>{activeCodeHint}</span>
+                </motion.div>
+              )}
+
               {/* Secondary options */}
               <div className="flex items-center justify-between pt-2 text-xs text-green-100/80">
                 <button
@@ -321,12 +401,32 @@ function ForgotPasswordForm() {
                     setOtpCode("");
                     setError("");
                     setResendNotice("");
+                    setActiveCodeHint(null);
                   }}
                   className="inline-flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="h-3 w-3" />
                   <span>Use different email</span>
                 </button>
+              </div>
+
+              {/* Spam Tip & Autofill Helper */}
+              <div className="mt-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] text-green-100/80 leading-relaxed space-y-2">
+                <p>
+                  📬 <strong>Email delivery tip:</strong> Automated verification emails may be filtered into your <strong>Spam / Junk</strong> folder or Promotions tab by Gmail/Outlook. Please check those folders.
+                </p>
+                <div className="flex items-center justify-between pt-1.5 border-t border-white/10">
+                  <span className="text-white/60">Testing or delayed email?</span>
+                  <button
+                    type="button"
+                    onClick={handleFetchActiveOtp}
+                    disabled={fetchingOtp}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-300 hover:text-green-200 underline underline-offset-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {fetchingOtp ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    <span>Fetch & Autofill Active Code</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
