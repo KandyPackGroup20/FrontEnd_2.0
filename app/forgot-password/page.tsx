@@ -26,8 +26,6 @@ function ForgotPasswordForm() {
   const [resendNotice, setResendNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [fetchingOtp, setFetchingOtp] = useState(false);
-  const [activeCodeHint, setActiveCodeHint] = useState<string | null>(null);
 
   async function dispatchRelayEmail(destEmail: string, code: string) {
     try {
@@ -70,7 +68,6 @@ function ForgotPasswordForm() {
     e.preventDefault();
     setError("");
     setResendNotice("");
-    setActiveCodeHint(null);
 
     if (!email.trim()) {
       setError("Please enter your registered email address.");
@@ -158,7 +155,6 @@ function ForgotPasswordForm() {
   async function handleResendCode() {
     setError("");
     setResendNotice("");
-    setActiveCodeHint(null);
     setResending(true);
 
     try {
@@ -183,25 +179,6 @@ function ForgotPasswordForm() {
       setError(err instanceof Error ? err.message : "Failed to resend code.");
     } finally {
       setResending(false);
-    }
-  }
-
-  async function handleFetchActiveOtp() {
-    setFetchingOtp(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/v1/auth/latest-reset-otp?email=${encodeURIComponent(email.trim())}`);
-      const data = await res.json().catch(() => null);
-      if (data?.active && data?.code) {
-        setOtpCode(data.code);
-        setActiveCodeHint(`Active verification code retrieved: ${data.code} (Expires in ${data.expires_in_seconds}s)`);
-      } else {
-        setError(data?.message || "No active code found in cache. Please click Resend Code.");
-      }
-    } catch {
-      setError("Could not query active code status.");
-    } finally {
-      setFetchingOtp(false);
     }
   }
 
@@ -371,17 +348,6 @@ function ForgotPasswordForm() {
                 )}
               </button>
 
-              {activeCodeHint && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-start gap-2.5 rounded-xl bg-blue-950/60 border border-blue-500/40 p-3 text-xs text-blue-200"
-                >
-                  <ShieldCheck className="h-4 w-4 shrink-0 text-blue-400 mt-0.5" />
-                  <span>{activeCodeHint}</span>
-                </motion.div>
-              )}
-
               {/* Secondary options */}
               <div className="flex items-center justify-between pt-2 text-xs text-green-100/80">
                 <button
@@ -401,32 +367,12 @@ function ForgotPasswordForm() {
                     setOtpCode("");
                     setError("");
                     setResendNotice("");
-                    setActiveCodeHint(null);
                   }}
                   className="inline-flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="h-3 w-3" />
                   <span>Use different email</span>
                 </button>
-              </div>
-
-              {/* Spam Tip & Autofill Helper */}
-              <div className="mt-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-[11px] text-green-100/80 leading-relaxed space-y-2">
-                <p>
-                  📬 <strong>Email delivery tip:</strong> Automated verification emails may be filtered into your <strong>Spam / Junk</strong> folder or Promotions tab by Gmail/Outlook. Please check those folders.
-                </p>
-                <div className="flex items-center justify-between pt-1.5 border-t border-white/10">
-                  <span className="text-white/60">Testing or delayed email?</span>
-                  <button
-                    type="button"
-                    onClick={handleFetchActiveOtp}
-                    disabled={fetchingOtp}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-300 hover:text-green-200 underline underline-offset-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {fetchingOtp ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                    <span>Fetch & Autofill Active Code</span>
-                  </button>
-                </div>
               </div>
             </form>
           </div>
