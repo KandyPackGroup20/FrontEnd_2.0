@@ -321,6 +321,12 @@ function Form() {
                 >
                   Password
                 </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-green-300 hover:text-green-200 transition-colors underline underline-offset-2"
+                >
+                  Forgot password?
+                </Link>
               </div>
               <div className="relative">
                 <input
