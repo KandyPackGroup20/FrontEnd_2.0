@@ -191,9 +191,12 @@ export function DashboardSidebar({
       { id: "profile", label: "My Profile & Security", icon: ShieldCheck, href: "/profile" },
     ];
   } else if (resolvedRole === "DISPATCHER") {
-    // Only last-mile delivery truck and driver rostering
+    // Last-mile delivery truck and driver rostering operations
     navItems = [
-      { id: "roster", label: "Truck Fleet & Driver Roster", icon: Truck, href: "/admin/roster" },
+      { id: "roster", label: "Fleet Roster Planning", icon: Truck, href: "/admin/roster?tab=planning" },
+      { id: "hours", label: "Weekly Staff Hours", icon: Clock, href: "/admin/roster?tab=hours" },
+      { id: "history", label: "Accepted Assignment History", icon: History, href: "/admin/roster?tab=history" },
+      { id: "resources", label: "Roster Resources", icon: Layers, href: "/admin/roster?tab=resources" },
       { id: "active", label: "Active Delivery Runs", icon: MapPin, href: "/driver?tab=active" },
       { id: "profile", label: "Dispatcher Profile", icon: User, href: "/profile" },
     ];
@@ -260,7 +263,13 @@ export function DashboardSidebar({
       : pathname?.includes("/admin/rail")
       ? "rail"
       : pathname?.includes("/admin/roster")
-      ? "roster"
+      ? (typeof window !== "undefined"
+          ? (() => {
+              const tab = new URLSearchParams(window.location.search).get("tab");
+              if (tab === "hours" || tab === "history" || tab === "resources") return tab;
+              return "roster";
+            })()
+          : "roster")
       : pathname?.includes("/admin/reports")
       ? "reports"
       : pathname?.includes("/admin/users")
