@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   AlertsSidebar,
   NotificationBellButton,
@@ -405,42 +406,21 @@ export default function NewOrderPage() {
   }
 
   return (
-    <div className="relative min-h-screen pb-24 pt-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-green-50/40 via-white to-green-50/20">
-      <GradientBlobs />
-      {submissionError && <p role="alert" className="relative mx-auto mb-5 max-w-5xl rounded-2xl border border-green-200 bg-green-50 p-4">{submissionError}</p>}
-
-      {/* Top Bar */}
-      <div className="mx-auto max-w-5xl mb-8 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 text-text-heading no-underline group">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-white shadow-md shadow-green-600/20 group-hover:scale-105 transition-transform">
-            <Train className="h-5 w-5" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Kandypack</span>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <NotificationBellButton
-            onClick={() => {
-              setSidebarTab("unread");
-              setSidebarOpen(true);
-            }}
-            unreadCount={unreadCount}
-          />
-          <Link
-            href="/orders"
-            className="text-sm font-semibold text-text-muted hover:text-green-700 transition-colors"
-          >
-            Consignments
-          </Link>
-          <span className="text-gray-300">|</span>
-          <Link
-            href="/profile"
-            className="text-sm font-semibold text-text-muted hover:text-green-700 transition-colors"
-          >
-            Profile
-          </Link>
+    <DashboardLayout
+      activeKey="book"
+      roleOverride="CUSTOMER"
+      hubName="Book Consignment"
+      title="Book Rail & Road Consignment"
+      subtitle="Reserve guaranteed freight wagon capacity on Sri Lanka Railways mainline with doorstep delivery."
+      actions={
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" href="/orders">
+            <span>View All Orders</span>
+          </Button>
         </div>
-      </div>
+      }
+    >
+      {submissionError && <p role="alert" className="mb-5 max-w-5xl rounded-2xl border border-green-200 bg-green-50 p-4 text-xs text-red-700">{submissionError}</p>}
 
       <div className="mx-auto max-w-5xl">
         {/* Step Indicator */}
@@ -1141,7 +1121,7 @@ export default function NewOrderPage() {
         initialTab={sidebarTab}
         onNotificationsUpdated={(cnt) => setUnreadCount(cnt)}
       />
-    </div>
+    </DashboardLayout>
   );
 }
 

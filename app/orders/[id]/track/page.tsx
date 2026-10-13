@@ -24,6 +24,7 @@ import {
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 interface TrackingMilestone {
   title: string;
@@ -121,29 +122,21 @@ export default function OrderTrackPage() {
   const isCompleted = orderData?.raw_status === "COMPLETED";
 
   return (
-    <div className="relative min-h-screen pb-20 pt-8 px-4 sm:px-6 lg:px-8">
-      <GradientBlobs />
-
-      {/* Top Bar */}
-      <div className="mx-auto max-w-5xl mb-8 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-text-heading no-underline">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-white">
-            <Train className="h-5 w-5" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Kandypack</span>
+    <DashboardLayout
+      activeKey="orders"
+      roleOverride="CUSTOMER"
+      title="Consignment Tracking"
+      subtitle={`Tracking Order ${orderData?.id || orderId}`}
+      actions={
+        <Link
+          href="/orders"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-green-800 bg-white/80 hover:bg-white border border-green-200/80 px-3 py-1.5 rounded-xl transition-all shadow-xs"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to Shipments
         </Link>
-
-        <div className="flex items-center gap-3">
-          <Link
-            href="/orders"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-green-600 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Orders
-          </Link>
-        </div>
-      </div>
-
+      }
+    >
       <div className="mx-auto max-w-5xl">
         {/* Header Glass Card */}
         <div className="glass p-6 md:p-8 rounded-2xl mb-8">
@@ -415,6 +408,6 @@ export default function OrderTrackPage() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

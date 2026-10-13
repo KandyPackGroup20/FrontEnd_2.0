@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   TrendingUp,
   Award,
@@ -525,7 +526,8 @@ export default function ReportsPage() {
   if (!authorized) return null;
 
   return (
-    <main className="h-screen w-screen overflow-hidden flex flex-col bg-slate-50 text-slate-800 p-2.5 md:p-3.5">
+    <DashboardLayout activeKey="reports" hideHeader roleOverride="SUPERADMIN" hubName="Executive Reports">
+      <div className="h-full flex flex-col bg-slate-50 text-slate-800">
       {/* Top Header Bar: Clean, Compact, Fits to Screen */}
       <header className="shrink-0 mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-100/80 bg-white/90 px-3.5 py-2 shadow-sm backdrop-blur-md">
         <div className="flex items-center gap-2.5">
@@ -906,6 +908,7 @@ export default function ReportsPage() {
           </footer>
         </section>
         </div>
-    </main>
+      </div>
+    </DashboardLayout>
   );
 }

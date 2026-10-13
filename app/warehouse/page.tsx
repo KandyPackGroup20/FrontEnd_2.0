@@ -21,6 +21,7 @@ import {
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { apiFetch, describeError, ApiError, getAuthToken, setAuthToken } from "@/lib/api";
 
 // These ids match station_store in the database (06_seed_data.sql).
@@ -129,11 +130,22 @@ type Banner = { type: "success" | "error"; text: string } | null;
 
 export default function WarehousePage() {
   const [stationId, setStationId] = useState(1);
+  const [activeTab, setActiveTab] = useState<"inventory" | "manifests" | "adjustments" | "reports">("inventory");
   const [stock, setStock] = useState<StockRow[]>([]);
   const [manifests, setManifests] = useState<ManifestRow[]>([]);
   const [manifestsNote, setManifestsNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<Banner>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "manifests" || tab === "adjustments" || tab === "reports" || tab === "inventory") {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
 
   // Report #6 Summary State
   const [summaryReport, setSummaryReport] = useState<ReportSummary | null>(null);
@@ -442,108 +454,106 @@ export default function WarehousePage() {
     }
   }
 
+  const currentStation = STATIONS.find((s) => s.id === stationId);
+
   return (
-    <div className="relative min-h-screen pb-20 pt-8 px-4 sm:px-6 lg:px-8">
-      <GradientBlobs />
-
-      {/* Top header */}
-      <div className="relative mx-auto max-w-6xl mb-8 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-text-heading no-underline">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-white">
-            <Train className="h-5 w-5" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Kandypack</span>
-        </Link>
-        <span className="caption">Staff · Warehouse</span>
-      </div>
-
-      <div className="relative mx-auto max-w-6xl">
-        {/* Authenticated Employee Profile Bar */}
-        <div className="glass-sm mb-6 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-green-200/50">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 text-green-700">
-              <Shield className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-green-700 flex items-center gap-1.5">
-                <span>Active Portal Session</span>
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="font-bold text-green-800">
-                  {operator.role === "STORE_MGR"
-                    ? "Store Manager"
-                    : operator.role === "WAREHOUSE_STAFF"
-                    ? "Warehouse Staff"
-                    : operator.role === "LOGISTICS_MGR"
-                    ? "Logistics Manager"
-                    : "Administrator"}
-                </span>
-              </div>
-              <div className="text-sm font-bold text-text-heading">
-                {operator.name} <span className="text-xs font-normal text-text-muted">({operator.email})</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await apiFetch("/auth/logout", { method: "POST" });
-                } catch {}
-                setAuthToken(null);
-                if (typeof window !== "undefined") {
-                  window.location.href = "/login";
-                }
-              }}
-              className="text-xs px-3.5 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Sign Out
-            </button>
-          </div>
-        </div>
-
-        {/* Title + station picker */}
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-text-heading">
-              Warehouse &amp; Station Inventory
-            </h1>
-            <p className="mt-1 text-sm text-text-muted">
-              Receive train shipments and keep station stock accurate.
-            </p>
-          </div>
-
-          <div className="w-full md:w-56">
-            <label htmlFor="station" className="input-label">
-              Station
+    <DashboardLayout
+      activeKey={activeTab}
+      onTabChange={(key) => setActiveTab(key as any)}
+      roleOverride={operator.role}
+      hubName={`${currentStation?.name || "Station"} Goods Shed`}
+      title="Warehouse Depot & Station Inventory"
+      subtitle={`Physical Goods Shed Store · ${currentStation?.name || "Regional"} Central Warehouse`}
+      actions={
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label htmlFor="station-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap hidden sm:inline">
+              Depot Hub:
             </label>
             <select
-              id="station"
-              className={`input ${(operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF") ? "opacity-80 bg-slate-100 cursor-not-allowed" : ""}`}
+              id="station-select"
+              className={`text-xs font-semibold py-1.5 px-3 rounded-xl border border-slate-300 bg-white shadow-xs focus:ring-2 focus:ring-green-500 ${
+                operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF"
+                  ? "opacity-80 bg-slate-100 cursor-not-allowed"
+                  : ""
+              }`}
               value={stationId}
               disabled={operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF"}
               onChange={(e) => handleStationChange(Number(e.target.value))}
             >
               {STATIONS.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s.name} Depot
                 </option>
               ))}
             </select>
-            {(operator.role === "STORE_MGR" || operator.role === "WAREHOUSE_STAFF") && (
-              <span className="text-[11px] text-text-muted mt-1 block">
-                Assigned station for your account
-              </span>
-            )}
-            {(operator.role === "LOGISTICS_MGR" || operator.role === "SUPERADMIN") && (
-              <span className="text-[11px] text-green-700 font-medium mt-1 block">
-                Multi-hub network oversight active
-              </span>
-            )}
           </div>
+          <button
+            onClick={reloadStation}
+            className="px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-medium text-slate-700 flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+            title="Refresh station data"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-green-600 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
         </div>
+      }
+    >
+      {/* Top Tab Switcher Pill Bar */}
+      <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200/80">
+        <button
+          onClick={() => setActiveTab("inventory")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "inventory"
+              ? "bg-green-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Layers className="h-4 w-4" />
+          <span>Station Inventory & Bins</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
+            {stock.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab("manifests")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "manifests"
+              ? "bg-green-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Train className="h-4 w-4" />
+          <span>Inbound Train Manifests</span>
+          {manifests.filter((m) => m.manifest_status === "PENDING").length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white">
+              {manifests.filter((m) => m.manifest_status === "PENDING").length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("adjustments")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "adjustments"
+              ? "bg-green-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <AlertTriangle className="h-4 w-4" />
+          <span>Log Stock Adjustment</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("reports")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "reports"
+              ? "bg-green-700 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <BarChart3 className="h-4 w-4" />
+          <span>Depot Loss & Reports</span>
+        </button>
+      </div>
 
         {/* Success / error banner */}
         {banner && (
@@ -558,7 +568,7 @@ export default function WarehousePage() {
         )}
 
         {/* Store Manager Report #6 KPI Summary Cards */}
-        {summaryReport && (
+        {activeTab === "reports" && summaryReport && (
           <section className="mb-6 space-y-4" aria-labelledby="report-summary-title">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -693,9 +703,9 @@ export default function WarehousePage() {
           </section>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Incoming manifests */}
-          <section className="glass p-6" aria-labelledby="manifests-title">
+        {/* ── TAB: Inbound Train Manifests ── */}
+        {activeTab === "manifests" && (
+          <section className="glass p-6 rounded-2xl border border-slate-200/80" aria-labelledby="manifests-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="manifests-title" className="text-lg font-semibold text-text-heading">
                 Incoming Train Manifests
@@ -824,9 +834,11 @@ export default function WarehousePage() {
                 })}
               </ul>
             </section>
+        )}
 
-          {/* Station stock */}
-          <section className="glass p-6" aria-labelledby="stock-title">
+        {/* ── TAB: Station Inventory & Bins ── */}
+        {activeTab === "inventory" && (
+          <section className="glass p-6 rounded-2xl border border-slate-200/80" aria-labelledby="stock-title">
             <h2 id="stock-title" className="mb-4 text-lg font-semibold text-text-heading">
               Station Stock &amp; Storage Bins
             </h2>
@@ -956,10 +968,11 @@ export default function WarehousePage() {
               ))}
             </ul>
           </section>
-        </div>
+        )}
 
-        {/* Log a stock adjustment */}
-        <section className="glass mt-6 p-6" aria-labelledby="adjust-title">
+        {/* ── TAB: Log Stock Adjustment ── */}
+        {activeTab === "adjustments" && (
+          <section className="glass p-6 rounded-2xl border border-slate-200/80 max-w-3xl" aria-labelledby="adjust-title">
           <h2 id="adjust-title" className="mb-1 text-lg font-semibold text-text-heading">
             Log a Stock Adjustment
           </h2>
@@ -1046,7 +1059,7 @@ export default function WarehousePage() {
             </div>
           </form>
         </section>
-      </div>
-    </div>
+        )}
+    </DashboardLayout>
   );
 }

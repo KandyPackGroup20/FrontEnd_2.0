@@ -20,6 +20,7 @@ import {
 import Button from "@/components/ui/Button";
 import StatusPill from "@/components/ui/StatusPill";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import RailManagement from "@/components/rail/RailManagement";
 import RosterOverview from "@/components/roster/RosterOverview";
 import {
@@ -131,6 +132,17 @@ export default function OrdersPage() {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [currentUser, setCurrentUser] = useState<{ user_id: number; email: string; role: string; name: string } | null>(null);
   const [subCategory, setSubCategory] = useState<"dispatches" | "rail" | "roster">("dispatches");
+  const [ordersView, setOrdersView] = useState<"active" | "all" | "tracking">("active");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const v = p.get("view");
+      if (v === "history" || v === "all") setOrdersView("all");
+      else if (v === "tracking") setOrdersView("tracking");
+      else if (v === "active") setOrdersView("active");
+    }
+  }, []);
 
   async function handleLogout() {
     try {
@@ -208,12 +220,18 @@ export default function OrdersPage() {
     currentUser && (currentUser.role === "LOGISTICS_MGR" || currentUser.role === "SUPERADMIN")
   );
 
+  const pendingCount = orders.filter((o) => o.status !== "delivered").length;
+
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.cargo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.recipient.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (ordersView === "active" && statusFilter === "all") {
+      return matchesSearch && order.status !== "delivered";
+    }
 
     const matchesStatus =
       statusFilter === "all" ? true : order.status === statusFilter;
@@ -222,146 +240,113 @@ export default function OrdersPage() {
   });
 
   return (
-    <div className="relative min-h-screen pb-20 pt-8 px-4 sm:px-6 lg:px-8">
-      <GradientBlobs />
-
-      {/* Top Header */}
-      <div className="mx-auto max-w-6xl mb-8 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-text-heading no-underline">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-white">
-            <Train className="h-5 w-5" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Kandypack</span>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          {currentUser && (
-            <NotificationBellButton
-              onClick={() => {
-                setSidebarTab("unread");
-                setSidebarOpen(true);
-              }}
-              unreadCount={unreadCount}
-            />
-          )}
-          {isLogisticsStaff ? (
-            <Button variant="primary" size="sm" href="/admin/rail">
-              <Train className="h-4 w-4" />
-              Rail Allocations
-            </Button>
-          ) : (
-            <Button variant="primary" size="sm" href="/order/new">
-              <Plus className="h-4 w-4" />
-              Book Shipment
-            </Button>
-          )}
-          <Link
-            href="/profile"
-            className="text-sm font-medium text-text-muted hover:text-green-600 transition-colors"
-          >
-            {currentUser ? currentUser.name.split(" ")[0] : "Profile"}
-          </Link>
-          {currentUser && (
-            <button
-              onClick={handleLogout}
-              className="text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Sign Out
-            </button>
-          )}
-        </div>
+    <DashboardLayout
+      activeKey={ordersView === "all" ? "history" : ordersView === "tracking" ? "tracking" : "active"}
+      onTabChange={(key) => {
+        if (key === "history") setOrdersView("all");
+        else if (key === "tracking") setOrdersView("tracking");
+        else if (key === "active") setOrdersView("active");
+      }}
+      roleOverride={currentUser?.role || "CUSTOMER"}
+      hubName="Customer Consignments"
+      title="Freight Shipments & Dispatches"
+      subtitle="Track and review all your rail freight consignments dispatched from Kandy Goods Yard."
+      actions={
+        <Button variant="primary" size="sm" href="/order/new">
+          <Plus className="h-4 w-4" />
+          <span>Book New Consignment</span>
+        </Button>
+      }
+    >
+      {/* Top Tab Pill Bar */}
+      <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 border-b border-slate-200/80">
+        <button
+          onClick={() => {
+            setOrdersView("active");
+            setStatusFilter("all");
+          }}
+          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+            ordersView === "active"
+              ? "bg-green-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Package className="h-4 w-4" />
+          <span>Active In-Transit Shipments</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
+            {pendingCount}
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setOrdersView("all");
+            setStatusFilter("all");
+          }}
+          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+            ordersView === "all"
+              ? "bg-green-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Train className="h-4 w-4" />
+          <span>All Consignments &amp; History</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
+            {orders.length}
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setOrdersView("tracking");
+          }}
+          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+            ordersView === "tracking"
+              ? "bg-green-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Search className="h-4 w-4" />
+          <span>Consignment Tracking Search</span>
+        </button>
       </div>
 
-      <div className="mx-auto max-w-6xl">
-        {/* Page Title */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-text-heading">
-              {subCategory === "rail"
-                ? "Rail Capacity & Allocation"
-                : subCategory === "roster"
-                ? "Truck Roster & Fleet"
-                : "Shipment History"}
-            </h1>
-            <p className="text-sm text-text-muted mt-1">
-              {subCategory === "rail"
-                ? "Schedule train trips, allocate freight wagon capacity, and manage multi-trip cargo spillover."
-                : subCategory === "roster"
-                ? "Review delivery schedules, trucks, and the delivery staff assigned to each route."
-                : "Track and review all your rail freight consignments dispatched from Kandy."}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isLogisticsStaff && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setSidebarTab("history");
-                  setSidebarOpen(true);
-                }}
-                className="text-emerald-800 border-emerald-300 hover:bg-emerald-50 cursor-pointer"
-              >
-                Alert History Tab
-              </Button>
-            )}
-            {isLogisticsStaff ? (
-              <Button variant="secondary" size="sm" href="/admin/rail">
-                <Train className="h-4 w-4" />
-                Go to Rail Allocation
-              </Button>
-            ) : (
-              <Button variant="secondary" size="sm" href="/order/new">
-                <Plus className="h-4 w-4" />
-                New Consignment
-              </Button>
-            )}
-          </div>
+      {/* Sub-Category Switcher for Logistics Manager */}
+      {isLogisticsStaff && (
+        <div className="mb-6 flex flex-wrap items-center gap-2 bg-white/80 p-1.5 rounded-2xl border border-slate-200/80 max-w-fit">
+          <button
+            onClick={() => setSubCategory("dispatches")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              subCategory === "dispatches"
+                ? "bg-green-600 text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <Package className="h-4 w-4" />
+            <span>Shipment Dispatches</span>
+          </button>
+          <button
+            onClick={() => setSubCategory("rail")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              subCategory === "rail"
+                ? "bg-green-600 text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <Train className="h-4 w-4" />
+            <span>Rail Capacity &amp; Allocation</span>
+          </button>
+          <button
+            onClick={() => setSubCategory("roster")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              subCategory === "roster"
+                ? "bg-green-600 text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <Truck className="h-4 w-4" />
+            <span>Truck Roster</span>
+          </button>
         </div>
-
-        {/* Sub-Category Switcher for Logistics Manager */}
-        {isLogisticsStaff && (
-          <div className="mb-6 flex flex-wrap items-center gap-3 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl border border-white/60 shadow-xs max-w-fit">
-            <button
-              onClick={() => setSubCategory("dispatches")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                subCategory === "dispatches"
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
-              }`}
-            >
-              <Package className="h-4 w-4" />
-              <span>Shipment Dispatches</span>
-            </button>
-            <button
-              onClick={() => setSubCategory("rail")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                subCategory === "rail"
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
-              }`}
-            >
-              <Train className="h-4 w-4" />
-              <span>Rail Capacity & Allocation</span>
-              <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">
-                LM Portal
-              </span>
-            </button>
-            <button
-              onClick={() => setSubCategory("roster")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                subCategory === "roster"
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
-              }`}
-            >
-              <Truck className="h-4 w-4" />
-              <span>Truck Roster</span>
-            </button>
-          </div>
-        )}
+      )}
 
         {subCategory === "rail" ? (
           <div className="mt-2">
@@ -636,7 +621,6 @@ export default function OrdersPage() {
         </div>
         </>
         )}
-      </div>
 
       {/* Slide-over Logistics Alerts & History Sidebar Drawer */}
       <AlertsSidebar
@@ -648,7 +632,7 @@ export default function OrdersPage() {
           setNotifications(notifs);
         }}
       />
-    </div>
+    </DashboardLayout>
   );
 }
 

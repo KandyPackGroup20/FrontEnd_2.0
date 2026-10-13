@@ -19,9 +19,11 @@ import {
   User,
   LogOut,
   Train,
+  RefreshCw,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 interface DeliveryStop {
   delivery_id: number;
@@ -49,8 +51,18 @@ export default function DriverPortalPage() {
   const [error, setError] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [proofNote, setProofNote] = useState<string>("Handed over to recipient, signed.");
-  const [activeTab, setActiveTab] = useState<"pending" | "completed">("pending");
+  const [activeTab, setActiveTab] = useState<"active" | "completed" | "vehicle" | "guide">("active");
   const [currentUser, setCurrentUser] = useState<{ name: string; role: string; email: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const t = p.get("tab");
+      if (t === "active" || t === "completed" || t === "vehicle" || t === "guide") {
+        setActiveTab(t);
+      }
+    }
+  }, []);
 
   async function loadDeliveries() {
     setLoading(true);
@@ -118,88 +130,84 @@ export default function DriverPortalPage() {
 
   const pendingStops = deliveries.filter((d) => d.delivery_status !== "DELIVERED");
   const completedStops = deliveries.filter((d) => d.delivery_status === "DELIVERED");
-  const displayStops = activeTab === "pending" ? pendingStops : completedStops;
+  const displayStops = activeTab === "completed" ? completedStops : pendingStops;
 
   return (
-    <div className="relative min-h-screen pb-20 pt-8 px-4 sm:px-6 lg:px-8">
-      <GradientBlobs />
-
-      {/* Top Bar Navigation */}
-      <div className="mx-auto max-w-6xl mb-6 flex items-center justify-between">
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 text-text-heading no-underline group"
+    <DashboardLayout
+      activeKey={activeTab}
+      onTabChange={(key) => setActiveTab(key as any)}
+      roleOverride={currentUser?.role || "DRIVER"}
+      hubName={deliveries[0]?.station_name || "Regional Dispatch Hub"}
+      title="Driver Road Dispatch Portal"
+      subtitle="Manage your assigned local truck runs and verify customer doorstep handovers."
+      actions={
+        <button
+          onClick={loadDeliveries}
+          className="btn-secondary px-3.5 py-1.5 text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-white shadow-md shadow-green-600/20 group-hover:scale-105 transition-transform">
-            <Train className="h-5 w-5" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">
-            Kandypack
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-green-600" : ""}`} />
+          <span>Refresh Runs</span>
+        </button>
+      }
+    >
+      {/* Tab Selection Pill Bar */}
+      <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 border-b border-slate-200/80">
+        <button
+          onClick={() => setActiveTab("active")}
+          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "active"
+              ? "bg-green-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <Truck className="h-4 w-4" />
+          <span>Active Stops</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
+            {pendingStops.length}
           </span>
-        </Link>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            href="/profile"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-green-700 transition-colors px-3 py-1.5 rounded-xl border border-transparent hover:border-green-200"
-          >
-            <User className="h-3.5 w-3.5" />
-            <span>Profile & Account</span>
-          </Link>
-
-          <Link
-            href="/orders"
-            className="hidden sm:inline-flex items-center text-xs font-semibold text-text-muted hover:text-green-700 transition-colors px-3 py-1.5 rounded-xl"
-          >
-            Browse Shipments
-          </Link>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200/80 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Sign Out
-          </button>
-        </div>
+        </button>
+        <button
+          onClick={() => setActiveTab("completed")}
+          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "completed"
+              ? "bg-green-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          <span>Delivered History</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
+            {completedStops.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab("vehicle")}
+          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "vehicle"
+              ? "bg-green-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <MapPin className="h-4 w-4" />
+          <span>Assigned Truck &amp; Route</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("guide")}
+          className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "guide"
+              ? "bg-green-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <FileText className="h-4 w-4" />
+          <span>Handover Guidelines</span>
+        </button>
       </div>
 
-      <div className="mx-auto max-w-6xl">
-        {/* Header */}
-        <div className="glass p-6 md:p-8 rounded-2xl mb-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-600 text-white shadow-lg shadow-green-600/30">
-                <Truck className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-text-heading">
-                  Driver Road Dispatch Portal
-                </h1>
-                <p className="text-xs text-text-muted">
-                  {currentUser ? (
-                    <span>
-                      Logged in as <strong>{currentUser.name}</strong> ({currentUser.role})
-                    </span>
-                  ) : (
-                    "Manage your assigned local truck runs and verify customer doorstep handovers."
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={loadDeliveries}
-                className="btn-secondary px-4 py-2 text-xs flex items-center gap-1.5"
-              >
-                Refresh Runs
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 mt-6 border-t border-surface-glass-border text-xs">
+      {/* Metrics Bar */}
+      {(activeTab === "active" || activeTab === "completed") && (
+        <div className="glass p-5 rounded-2xl mb-6 border border-slate-200/80">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div>
               <span className="text-text-muted block">Pending Stops</span>
               <strong className="text-lg font-bold text-green-700">{pendingStops.length}</strong>
@@ -222,30 +230,7 @@ export default function DriverPortalPage() {
             </div>
           </div>
         </div>
-
-        {/* Tab Selection */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => setActiveTab("pending")}
-            className={`px-5 py-2.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${
-              activeTab === "pending"
-                ? "bg-green-600 text-white shadow-md shadow-green-600/20"
-                : "glass text-text-body hover:text-green-700"
-            }`}
-          >
-            Active Stops ({pendingStops.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("completed")}
-            className={`px-5 py-2.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${
-              activeTab === "completed"
-                ? "bg-green-600 text-white shadow-md shadow-green-600/20"
-                : "glass text-text-body hover:text-green-700"
-            }`}
-          >
-            Delivered History ({completedStops.length})
-          </button>
-        </div>
+      )}
 
         {/* Error Notification */}
         {error && (
@@ -255,7 +240,9 @@ export default function DriverPortalPage() {
           </div>
         )}
 
-        {/* Deliveries List */}
+      {/* Deliveries List */}
+      {(activeTab === "active" || activeTab === "completed") && (
+        <div>
         {loading ? (
           <div className="glass p-12 text-center rounded-2xl">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-600 mb-3" />
@@ -265,10 +252,10 @@ export default function DriverPortalPage() {
           <div className="glass p-12 text-center rounded-2xl">
             <CheckCircle2 className="h-10 w-10 text-green-600 mx-auto mb-3" />
             <h3 className="text-base font-bold text-text-heading mb-1">
-              {activeTab === "pending" ? "No Pending Stops Remaining!" : "No Completed Deliveries Yet"}
+              {activeTab === "active" ? "No Pending Stops Remaining!" : "No Completed Deliveries Yet"}
             </h3>
             <p className="text-xs text-text-muted max-w-md mx-auto">
-              {activeTab === "pending"
+              {activeTab === "active"
                 ? "All assigned customer orders on this run have been delivered. New runs will appear once scheduled by Dispatcher."
                 : "Deliveries marked as complete will appear here with confirmation proof."}
             </p>
@@ -406,7 +393,122 @@ export default function DriverPortalPage() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+        </div>
+      )}
+
+      {/* ── TAB: Assigned Truck & Route Info ── */}
+      {activeTab === "vehicle" && (
+        <div className="glass p-6 rounded-2xl border border-slate-200/80 max-w-3xl space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-text-heading flex items-center gap-2">
+              <Truck className="h-5 w-5 text-green-600" />
+              <span>Assigned Delivery Vehicle &amp; Route</span>
+            </h2>
+            <p className="text-xs text-text-muted mt-0.5">
+              Assigned by Colombo Roster Dispatcher for your daily delivery run.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="glass-sm p-4 rounded-xl border border-slate-200/60">
+              <span className="text-xs text-text-muted">License Plate</span>
+              <p className="text-base font-bold text-green-700 mt-1 font-mono">
+                {deliveries[0]?.truck_plate || "WP-CA-8921 (Isuzu 3.5T)"}
+              </p>
+              <span className="text-[10px] text-text-muted">Heavy goods commercial registration</span>
+            </div>
+
+            <div className="glass-sm p-4 rounded-xl border border-slate-200/60">
+              <span className="text-xs text-text-muted">Assigned Route</span>
+              <p className="text-base font-bold text-text-heading mt-1">
+                {deliveries[0]?.route_name || "Colombo Central - Fort - Kollupitiya"}
+              </p>
+              <span className="text-[10px] text-text-muted">Zone 1 Regional Metro Corridor</span>
+            </div>
+
+            <div className="glass-sm p-4 rounded-xl border border-slate-200/60">
+              <span className="text-xs text-text-muted">Departure Station Hub</span>
+              <p className="text-base font-bold text-text-heading mt-1">
+                {deliveries[0]?.station_name || "Colombo Central Hub"}
+              </p>
+              <span className="text-[10px] text-text-muted">Goods Shed Cargo Bay #3</span>
+            </div>
+
+            <div className="glass-sm p-4 rounded-xl border border-slate-200/60">
+              <span className="text-xs text-text-muted">Shift Timing</span>
+              <p className="text-base font-bold text-text-heading mt-1">
+                08:00 AM – 05:30 PM
+              </p>
+              <span className="text-[10px] text-text-muted">Maximum 40h weekly roster cap</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: Handover Guidelines ── */}
+      {activeTab === "guide" && (
+        <div className="glass p-6 rounded-2xl border border-slate-200/80 max-w-3xl space-y-5">
+          <div>
+            <h2 className="text-lg font-bold text-text-heading flex items-center gap-2">
+              <FileText className="h-5 w-5 text-green-600" />
+              <span>Doorstep Delivery Standard Operating Procedures</span>
+            </h2>
+            <p className="text-xs text-text-muted mt-0.5">
+              Protocol checklist for Kandypack certified drivers and dispatch assistants.
+            </p>
+          </div>
+
+          <div className="space-y-3 text-xs text-slate-700">
+            <div className="glass-sm p-3.5 rounded-xl border border-slate-200/60 flex items-start gap-3">
+              <div className="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold shrink-0">
+                1
+              </div>
+              <div>
+                <strong className="text-text-heading block">Customer Verification</strong>
+                <p className="text-text-muted mt-0.5">
+                  Confirm recipient name and registered phone number prior to unloading cartons from the truck.
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-sm p-3.5 rounded-xl border border-slate-200/60 flex items-start gap-3">
+              <div className="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold shrink-0">
+                2
+              </div>
+              <div>
+                <strong className="text-text-heading block">Package Condition Check</strong>
+                <p className="text-text-muted mt-0.5">
+                  Verify safety seals on FMCG crates. In case of carton breakage, take photo evidence and note in proof field.
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-sm p-3.5 rounded-xl border border-slate-200/60 flex items-start gap-3">
+              <div className="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold shrink-0">
+                3
+              </div>
+              <div>
+                <strong className="text-text-heading block">Proof of Delivery Entry</strong>
+                <p className="text-text-muted mt-0.5">
+                  Click &ldquo;Mark as Delivered to Customer&rdquo; immediately upon handover to ensure real-time status sync with headquarters.
+                </p>
+              </div>
+            </div>
+
+            <div className="glass-sm p-3.5 rounded-xl border border-slate-200/60 flex items-start gap-3">
+              <div className="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold shrink-0">
+                4
+              </div>
+              <div>
+                <strong className="text-text-heading block">Undelivered Returns</strong>
+                <p className="text-text-muted mt-0.5">
+                  If recipient is unreachable after 3 attempts, bring merchandise back to the regional station depot goods shed before 6:00 PM.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </DashboardLayout>
   );
 }

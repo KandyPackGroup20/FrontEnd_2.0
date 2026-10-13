@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import RosterOverview from "@/components/roster/RosterOverview";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export const metadata: Metadata = {
   title: "Truck roster",
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function RosterPage() {
-  return <RosterOverview />;
+  return (
+    <DashboardLayout activeKey="roster" hideHeader roleOverride="LOGISTICS_MGR" hubName="Driver Roster">
+      <RosterOverview />
+    </DashboardLayout>
+  );
 }

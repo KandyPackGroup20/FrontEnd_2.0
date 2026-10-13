@@ -26,6 +26,7 @@ import {
 
 import Button from "@/components/ui/Button";
 import GradientBlobs from "@/components/ui/GradientBlobs";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { canReadRoster } from "@/lib/roster/types";
 
 interface UserProfile {
@@ -356,107 +357,23 @@ function ProfileContent() {
   const isSuperadmin = profile?.role === "SUPERADMIN";
 
   return (
-    <div className="relative min-h-screen pb-20 pt-8 px-4 sm:px-6 lg:px-8">
-      <GradientBlobs />
-
-      {/* Top Bar */}
-      <div className="mx-auto max-w-5xl mb-8 flex items-center justify-between">
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 text-text-heading no-underline group"
+    <DashboardLayout
+      activeKey="profile"
+      user={profile}
+      roleOverride={profile?.role}
+      hubName={profile?.station_name || "Profile & Security"}
+      title={isSuperadmin ? "Security & Staff Directory" : "Account & Profile"}
+      subtitle="Manage personal credentials, security keys, and account settings."
+      actions={
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200/80 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-white shadow-md shadow-green-600/20 group-hover:scale-105 transition-transform">
-            <Train className="h-5 w-5" />
-          </div>
-
-          <span className="text-xl font-bold tracking-tight">
-            Kandypack
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          {profile &&
-            canReadRoster(profile.role) &&
-            !profile.force_password_reset &&
-            !isForcedReset && (
-              <Link
-                href="/admin/roster"
-                className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-green-700 transition-colors hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-green-600"
-              >
-                Truck roster
-              </Link>
-            )}
-
-          {profile?.role === "CUSTOMER" && (
-            <>
-              <Link
-                href="/orders"
-                className="text-sm font-semibold text-text-muted hover:text-green-700 transition-colors"
-              >
-                Shipments
-              </Link>
-              <Button
-                variant="primary"
-                size="sm"
-                href="/order/new"
-              >
-                Book Shipment
-              </Button>
-            </>
-          )}
-
-          {profile?.role === "LOGISTICS_MGR" && (
-            <Button
-              variant="primary"
-              size="sm"
-              href="/admin/rail"
-            >
-              Rail Management Portal
-            </Button>
-          )}
-
-          {profile?.role === "DISPATCHER" && (
-            <Button
-              variant="primary"
-              size="sm"
-              href="/admin/roster"
-            >
-              Truck Roster Portal
-            </Button>
-          )}
-
-          {profile?.role && ["STORE_MGR", "WAREHOUSE_STAFF"].includes(profile.role) && (
-            <Button
-              variant="primary"
-              size="sm"
-              href="/warehouse"
-            >
-              Warehouse Inventory
-            </Button>
-          )}
-
-          {profile?.role && ["DRIVER", "ASSISTANT"].includes(profile.role) && (
-            <Button
-              variant="primary"
-              size="sm"
-              href="/driver"
-              className="flex items-center gap-1.5"
-            >
-              <Truck className="h-3.5 w-3.5" />
-              <span>Driver Delivery Runs</span>
-            </Button>
-          )}
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200/80 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-xs"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Sign Out
-          </button>
-        </div>
-      </div>
-
+          <LogOut className="h-3.5 w-3.5" />
+          Sign Out
+        </button>
+      }
+    >
       <div className="mx-auto max-w-5xl">
         {/* Forced Password Reset Alert */}
         {(isForcedReset || profile?.force_password_reset) && (
@@ -1297,7 +1214,7 @@ function ProfileContent() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
 

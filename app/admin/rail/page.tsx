@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import RailManagement from "@/components/rail/RailManagement";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export const metadata: Metadata = {
   title: "Rail Capacity & Allocation | Kandypack Logistics",
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function RailPage() {
-  return <RailManagement initialTab="trips" />;
+  return (
+    <DashboardLayout activeKey="rail" hideHeader roleOverride="LOGISTICS_MGR" hubName="Rail Operations">
+      <RailManagement initialTab="trips" />
+    </DashboardLayout>
+  );
 }
