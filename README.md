@@ -147,7 +147,7 @@ sequenceDiagram
 | Role | Email | Password | Notes |
 |---|---|---|---|
 | **Pre-seeded Customer** | `customer1@gmail.com` | `password123` | Has historic orders and shipments ready to track. Direct password login (**no OTP prompt**). |
-| **Self-Registration** | Any email (e.g. `scriptspectra@gmail.com`) | Your custom password | Created via `/register`. Requires one-time 6-digit OTP verification upon account creation. All subsequent logins are 100% password-only without any OTP! |
+| **Self-Registration** | Any valid personal email (e.g. `your_email@gmail.com`) | Your custom password | Created via `/register`. A live 6-digit OTP email is dispatched directly to whatever email address you provide to verify ownership. Once verified, all subsequent sign-ins are 100% password-only without any OTP! |
 
 ---
 
@@ -222,8 +222,8 @@ Follow this step-by-step flow in your browser to demonstrate the complete lifecy
 
 ### Step 8: Password Reset & Account Recovery Walkthrough
 1. Go to `/login` and click **"Forgot password?"** (or navigate to `/forgot-password`).
-2. Enter your account email (e.g. `scriptspectra@gmail.com`).
-3. Click **"Send Reset Code"** — a 6-digit code is dispatched via Gmail SMTP directly to your real inbox.
+2. Enter your registered email (any email you used during registration).
+3. Click **"Send Reset Code"** — a 6-digit code is dispatched via Gmail SMTP directly to that email inbox.
 4. Enter the 6-digit code, type a new password (min 6 characters), and click **"Set New Password"**.
 5. The password is immediately updated and you can sign in with your new credentials!
 
