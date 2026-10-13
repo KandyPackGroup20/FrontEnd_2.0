@@ -87,8 +87,15 @@ export default function DriverPortalPage() {
         body: JSON.stringify({ proof_reference: proofNote }),
       });
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || "Failed to mark delivery complete.");
+        let errMsg = "Failed to mark delivery complete.";
+        try {
+          const errData = await res.json();
+          errMsg = errData.detail || errMsg;
+        } catch {
+          const text = await res.text().catch(() => "");
+          if (text) errMsg = text;
+        }
+        throw new Error(errMsg);
       }
       await loadDeliveries();
       setCompletingId(null);
