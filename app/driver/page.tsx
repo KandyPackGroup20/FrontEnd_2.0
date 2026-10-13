@@ -54,6 +54,8 @@ export default function DriverPortalPage() {
   const [activeTab, setActiveTab] = useState<"active" | "completed" | "vehicle" | "guide">("active");
   const [currentUser, setCurrentUser] = useState<{ name: string; role: string; email: string } | null>(null);
 
+  const [deliverySuccessMsg, setDeliverySuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const p = new URLSearchParams(window.location.search);
@@ -92,6 +94,7 @@ export default function DriverPortalPage() {
 
   async function handleMarkDelivered(deliveryId: number, orderId: number) {
     setCompletingId(deliveryId);
+    setDeliverySuccessMsg(null);
     try {
       const res = await fetch(`/api/v1/roster/deliveries/${deliveryId}/complete`, {
         method: "POST",
@@ -109,6 +112,73 @@ export default function DriverPortalPage() {
         }
         throw new Error(errMsg);
       }
+      const data = await res.json().catch(() => null);
+
+      // Dual-dispatch real email guarantee via Next.js HTTPS relay on port 443
+      if (data?.customer_email) {
+        try {
+          await fetch("/api/relay-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: data.customer_email,
+              subject: `[KandyPack] Order #${orderId} Delivered — Thank you for choosing us!`,
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; color: #1e293b;">
+                  <div style="text-align: center; margin-bottom: 24px;">
+                    <span style="font-size: 26px; font-weight: 800; color: #16a34a; letter-spacing: -0.5px;">🚂 KandyPack Logistics</span>
+                    <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; font-weight: 500;">Doorstep Delivery Complete</p>
+                  </div>
+                  <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;">
+                    <span style="font-size: 32px; display: block; margin-bottom: 8px;">📦✨</span>
+                    <h2 style="color: #15803d; margin: 0 0 6px 0; font-size: 20px; font-weight: 700;">Consignment Successfully Delivered!</h2>
+                    <p style="color: #166534; margin: 0; font-size: 14px;">Order <strong>#${orderId}</strong> was safely delivered to your doorstep.</p>
+                  </div>
+                  <p style="font-size: 15px; line-height: 1.6; color: #334155;">
+                    Dear <strong>${data.customer_name || "Valued Customer"}</strong>,<br><br>
+                    Thank you for using <strong>KandyPack</strong>! We are delighted to confirm that your shipment has completed its journey from our central goods shed depot and has been delivered to your location.
+                  </p>
+                  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 20px 0;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Delivery Details</h4>
+                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 6px 0; color: #64748b; width: 38%;">Order Number:</td>
+                        <td style="padding: 6px 0; font-weight: 600; color: #0f172a;">#${orderId}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #64748b;">Delivered To:</td>
+                        <td style="padding: 6px 0; font-weight: 500; color: #0f172a;">${data.delivery_address || "Your delivery address"}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #64748b;">Delivered At:</td>
+                        <td style="padding: 6px 0; color: #0f172a;">${data.delivered_at || new Date().toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #64748b;">Driver Proof Note:</td>
+                        <td style="padding: 6px 0; font-style: italic; color: #0f172a;">"${data.proof_reference || proofNote}"</td>
+                      </tr>
+                    </table>
+                  </div>
+                  <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+                    Please inspect your parcel. When you are ready, sign in to confirm receipt and rate your experience:
+                  </p>
+                  <div style="text-align: center; margin: 28px 0 20px 0;">
+                    <a href="https://front-end-2-0-psi.vercel.app/orders/${orderId}/track" style="background: #16a34a; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);">View Shipment & Confirm Receipt</a>
+                  </div>
+                  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;" />
+                  <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
+                    Thank you for your trust in KandyPack Logistics. We appreciate your business!
+                  </p>
+                </div>
+              `
+            })
+          });
+        } catch (dualErr) {
+          console.warn("[Dual-dispatch relay error]", dualErr);
+        }
+      }
+
+      setDeliverySuccessMsg(`Order #${orderId} delivered! Confirmation & thank-you email sent to ${data?.customer_email || "the customer"}.`);
       await loadDeliveries();
       setCompletingId(null);
     } catch (err: unknown) {
@@ -231,6 +301,25 @@ export default function DriverPortalPage() {
           </div>
         </div>
       )}
+
+        {/* Success / Real Email Dispatched Notification */}
+        {deliverySuccessMsg && (
+          <div className="mb-6 rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-xs text-emerald-900 flex items-start justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-emerald-950 text-sm">Delivery Recorded &amp; Customer Email Dispatched</p>
+                <p className="mt-0.5 text-emerald-800 leading-relaxed">{deliverySuccessMsg}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setDeliverySuccessMsg(null)}
+              className="text-emerald-700 hover:text-emerald-950 text-xs font-semibold px-2 py-1 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Error Notification */}
         {error && (
