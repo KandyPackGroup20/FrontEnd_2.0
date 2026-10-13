@@ -96,9 +96,12 @@ sequenceDiagram
 
 ## 🔑 Test Accounts, Emails & Passwords
 
-> **Master Password:** All pre-seeded accounts use the same universal password:
+> **Universal Password:** All pre-seeded accounts use the same master password:
 > ### `password123`
-> *(For 2FA OTP verification screens on test accounts, enter bypass code `000000` or `123456` if you do not have access to live email).*
+> * **Direct Password Sign-in:** Verified customers and staff accounts log in directly with their password without requiring any OTP!
+> * **One-Time Registration Verification:** Newly registered customers only verify an OTP once upon registration to confirm email ownership.
+> * **Password Recovery:** If you forget your password, click **"Forgot password?"** on `/login` to receive a 6-digit reset code via live email.
+> *(For testing when live email is unavailable, bypass code `000000` or `123456` can also be used).*
 
 ### 1. Management & Operations Staff
 
@@ -143,8 +146,8 @@ sequenceDiagram
 
 | Role | Email | Password | Notes |
 |---|---|---|---|
-| **Pre-seeded Customer** | `customer1@gmail.com` | `password123` | Has historic orders and shipments ready to track. |
-| **Self-Registration** | Any email (e.g. `scriptspectra@gmail.com`) | Your custom password | Created via `/register` (dispatches live email OTP). |
+| **Pre-seeded Customer** | `customer1@gmail.com` | `password123` | Has historic orders and shipments ready to track. Direct password login (**no OTP prompt**). |
+| **Self-Registration** | Any email (e.g. `scriptspectra@gmail.com`) | Your custom password | Created via `/register`. Requires one-time 6-digit OTP verification upon account creation. All subsequent logins are 100% password-only without any OTP! |
 
 ---
 
@@ -154,7 +157,7 @@ Follow this step-by-step flow in your browser to demonstrate the complete lifecy
 
 ### Step 1: Customer Places an Order
 1. Go to `http://localhost:3000/login`.
-2. Login as `customer1@gmail.com` / `password123` (enter OTP `000000` or the 6-digit code sent to your email).
+2. Login as `customer1@gmail.com` / `password123` (signs in directly with password — **no OTP required**).
 3. Navigate to **"Book Consignment"** (`/order/new`).
 4. Select cargo items (e.g. *Kandy Pure Ceylon BOPF Tea* + *Highland Vegetables*).
 5. Select destination hub: **Colombo** or **Galle**.
@@ -217,6 +220,13 @@ Follow this step-by-step flow in your browser to demonstrate the complete lifecy
 5. Add optional feedback notes and submit.
 6. Milestone 8 turns green and order status transitions to **`COMPLETED`**.
 
+### Step 8: Password Reset & Account Recovery Walkthrough
+1. Go to `/login` and click **"Forgot password?"** (or navigate to `/forgot-password`).
+2. Enter your account email (e.g. `scriptspectra@gmail.com`).
+3. Click **"Send Reset Code"** — a 6-digit code is dispatched via Gmail SMTP directly to your real inbox.
+4. Enter the 6-digit code, type a new password (min 6 characters), and click **"Set New Password"**.
+5. The password is immediately updated and you can sign in with your new credentials!
+
 ---
 
 ## 🗺 Frontend Route Matrix
@@ -224,8 +234,9 @@ Follow this step-by-step flow in your browser to demonstrate the complete lifecy
 | Route | Role Access | Description |
 |---|---|---|
 | `/` | Public | Interactive cinematic landing page with scroll-scrubbed train animation. |
-| `/login` | Public | Dual-portal authentication with 2FA OTP verification support. |
-| `/register` | Public | Customer registration with email OTP dispatch. |
+| `/login` | Public | Dual-portal authentication with instant password login for verified accounts. |
+| `/forgot-password` | Public | Password recovery with 6-digit OTP email verification and instant password reset. |
+| `/register` | Public | Customer registration with one-time email OTP verification. |
 | `/order/new` | `CUSTOMER` | Multi-step freight booking form with live pricing and route calculation. |
 | `/orders` | `CUSTOMER` | Customer order history, search, and active shipment list. |
 | `/orders/[id]/track` | `CUSTOMER`, Staff | Interactive live tracking timeline with 8 chronological supply chain milestones. |
