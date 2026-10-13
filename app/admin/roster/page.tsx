@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RosterPage() {
   return (
-    <DashboardLayout activeKey="roster" hideHeader roleOverride="LOGISTICS_MGR" hubName="Driver Roster">
+    <DashboardLayout activeKey="roster" hideHeader roleOverride="DISPATCHER" hubName="Driver Roster">
       <RosterOverview />
     </DashboardLayout>
   );

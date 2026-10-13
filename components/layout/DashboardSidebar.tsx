@@ -133,19 +133,31 @@ export function DashboardSidebar({
     return () => clearInterval(timer);
   }, [loadNotifBadge]);
 
-  // Determine current active role
-  const resolvedRole = (roleOverride || user?.role || "CUSTOMER").toUpperCase();
+  // Determine current active role strictly: 1) authenticated user.role, 2) roleOverride, 3) pathname inference, 4) CUSTOMER
+  let resolvedRole = (user?.role || roleOverride || "").toUpperCase();
+  if (!resolvedRole) {
+    if (pathname?.startsWith("/admin/rail")) resolvedRole = "LOGISTICS_MGR";
+    else if (pathname?.startsWith("/admin/roster")) resolvedRole = "DISPATCHER";
+    else if (pathname?.startsWith("/admin/users") || pathname?.startsWith("/admin/reports")) resolvedRole = "SUPERADMIN";
+    else if (pathname?.startsWith("/warehouse")) resolvedRole = "STORE_MGR";
+    else if (pathname?.startsWith("/driver")) resolvedRole = "DRIVER";
+    else resolvedRole = "CUSTOMER";
+  }
 
-  // Determine hub name
+  // Determine hub name according to role
   const displayHub =
     propHubName ||
     user?.station_name ||
-    (resolvedRole.includes("DRIVER")
-      ? "Driver Dispatch Hub"
-      : resolvedRole.includes("WAREHOUSE")
+    (resolvedRole === "LOGISTICS_MGR"
+      ? "Rail Operations"
+      : resolvedRole === "DISPATCHER"
+      ? "Road Dispatch Hub"
+      : resolvedRole === "STORE_MGR" || resolvedRole === "WAREHOUSE_STAFF"
       ? "Station Depot Store"
-      : resolvedRole.includes("ADMIN") || resolvedRole.includes("LOGISTICS_MGR")
-      ? "HQ Rail Command"
+      : resolvedRole === "DRIVER" || resolvedRole === "ASSISTANT"
+      ? "Delivery Run Fleet"
+      : resolvedRole === "SUPERADMIN"
+      ? "Head Office HQ"
       : "Colombo Central Hub");
 
   // Format member name
@@ -164,20 +176,46 @@ export function DashboardSidebar({
     router.push("/login");
   };
 
-  // Compute navigation items by role
+  // Compute navigation items STRICTLY for each role
   let navItems: NavItem[] = [];
 
   if (customNavItems && customNavItems.length > 0) {
     navItems = customNavItems;
-  } else if (pathname?.startsWith("/warehouse") || resolvedRole === "WAREHOUSE" || resolvedRole === "STORE_CLERK") {
+  } else if (resolvedRole === "LOGISTICS_MGR") {
+    // Only rail multimodal freight allocation, trips, breakdown, and pending consignments
     navItems = [
-      { id: "inventory", label: "Station Inventory & Bins", icon: Layers, href: "/warehouse?tab=inventory" },
-      { id: "manifests", label: "Inbound Manifests", icon: Train, href: "/warehouse?tab=manifests" },
+      { id: "rail", label: "Rail Allocation", icon: Train, href: "/admin/rail" },
+      { id: "trips", label: "Train Schedules", icon: Clock, href: "/admin/rail/trips" },
+      { id: "breakdown", label: "Order Allocations", icon: Layers, href: "/admin/rail/breakdown" },
+      { id: "orders", label: "Pending Consignments", icon: Package, href: "/admin/rail/orders" },
+      { id: "profile", label: "My Profile & Security", icon: ShieldCheck, href: "/profile" },
+    ];
+  } else if (resolvedRole === "DISPATCHER") {
+    // Only last-mile delivery truck and driver rostering
+    navItems = [
+      { id: "roster", label: "Truck Fleet & Driver Roster", icon: Truck, href: "/admin/roster" },
+      { id: "active", label: "Active Delivery Runs", icon: MapPin, href: "/driver?tab=active" },
+      { id: "profile", label: "Dispatcher Profile", icon: User, href: "/profile" },
+    ];
+  } else if (resolvedRole === "STORE_MGR") {
+    // Station store manager depot operations
+    navItems = [
+      { id: "manifests", label: "Inbound Train Manifests", icon: Train, href: "/warehouse?tab=manifests" },
+      { id: "inventory", label: "Station Stock & Storage Bins", icon: Layers, href: "/warehouse?tab=inventory" },
       { id: "adjustments", label: "Stock Adjustments", icon: AlertTriangle, href: "/warehouse?tab=adjustments" },
       { id: "reports", label: "Depot Loss & Reports", icon: BarChart3, href: "/warehouse?tab=reports" },
+      { id: "profile", label: "Store Manager Profile", icon: User, href: "/profile" },
+    ];
+  } else if (resolvedRole === "WAREHOUSE_STAFF" || resolvedRole === "STORE_CLERK" || resolvedRole === "WAREHOUSE") {
+    // Warehouse floor staff bin management
+    navItems = [
+      { id: "inventory", label: "Station Stock & Storage Bins", icon: Layers, href: "/warehouse?tab=inventory" },
+      { id: "manifests", label: "Inbound Manifests", icon: Train, href: "/warehouse?tab=manifests" },
+      { id: "adjustments", label: "Stock Adjustments", icon: AlertTriangle, href: "/warehouse?tab=adjustments" },
       { id: "profile", label: "Staff Profile", icon: User, href: "/profile" },
     ];
-  } else if (pathname?.startsWith("/driver") || resolvedRole === "DRIVER" || resolvedRole === "DISPATCHER") {
+  } else if (resolvedRole === "DRIVER" || resolvedRole === "ASSISTANT") {
+    // Delivery drivers and vehicle crew
     navItems = [
       { id: "active", label: "Active Delivery Stops", icon: Truck, href: "/driver?tab=active" },
       { id: "completed", label: "Completed Deliveries", icon: CheckCircle2, href: "/driver?tab=completed" },
@@ -185,17 +223,18 @@ export function DashboardSidebar({
       { id: "guide", label: "Handover Guidelines", icon: FileText, href: "/driver?tab=guide" },
       { id: "profile", label: "Driver Profile", icon: User, href: "/profile" },
     ];
-  } else if (pathname?.startsWith("/admin") || resolvedRole === "LOGISTICS_MGR" || resolvedRole === "SUPERADMIN") {
+  } else if (resolvedRole === "SUPERADMIN") {
+    // Head office administrator: staff provisioning, executive analytics & global oversight
     navItems = [
-      { id: "rail", label: "Rail Allocation", icon: Train, href: "/admin/rail" },
-      { id: "trips", label: "Train Schedules", icon: Clock, href: "/admin/rail/trips" },
-      { id: "roster", label: "Driver Rostering", icon: Truck, href: "/admin/roster" },
-      { id: "reports", label: "Executive Reports", icon: BarChart3, href: "/admin/reports" },
-      { id: "users", label: "Staff Directory", icon: Users, href: "/admin/users" },
-      { id: "profile", label: "Admin Security", icon: ShieldCheck, href: "/profile" },
+      { id: "users", label: "Staff Directory & Security", icon: Users, href: "/admin/users" },
+      { id: "reports", label: "Executive Analytics & Reports", icon: BarChart3, href: "/admin/reports" },
+      { id: "rail", label: "Rail Operations Overview", icon: Train, href: "/admin/rail" },
+      { id: "roster", label: "Fleet Rostering Overview", icon: Truck, href: "/admin/roster" },
+      { id: "warehouse", label: "Station Depots Overview", icon: Warehouse, href: "/warehouse" },
+      { id: "profile", label: "Superadmin Console", icon: ShieldCheck, href: "/profile" },
     ];
   } else {
-    // Customer
+    // CUSTOMER
     navItems = [
       { id: "active", label: "Active Shipments", icon: Package, href: "/orders" },
       { id: "history", label: "Order History", icon: History, href: "/orders?view=history" },
@@ -209,11 +248,15 @@ export function DashboardSidebar({
   const currentActiveKey =
     propActiveKey ||
     (pathname?.includes("/warehouse")
-      ? "inventory"
+      ? (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") || "inventory" : "inventory")
       : pathname?.includes("/driver")
-      ? "active"
+      ? (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") || "active" : "active")
       : pathname?.includes("/admin/rail/trips")
       ? "trips"
+      : pathname?.includes("/admin/rail/breakdown")
+      ? "breakdown"
+      : pathname?.includes("/admin/rail/orders")
+      ? "orders"
       : pathname?.includes("/admin/rail")
       ? "rail"
       : pathname?.includes("/admin/roster")
@@ -261,52 +304,70 @@ export function DashboardSidebar({
           {/* Primary View Icons */}
           <div className="flex flex-col items-center gap-3 w-full px-2">
             {/* Overview / Primary Action */}
-            <button
-              onClick={() => {
-                if (navItems[0]?.onClick) navItems[0].onClick();
-                else if (navItems[0]?.href) router.push(navItems[0].href);
-              }}
-              title={navItems[0]?.label || "Overview"}
-              className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all cursor-pointer ${
-                isDark
-                  ? "bg-white text-[#1b5e43] shadow-md shadow-black/10 font-bold"
-                  : "bg-[#1d6349] text-white shadow-md shadow-green-900/15"
-              }`}
-            >
-              <LayoutGrid className="h-5 w-5" />
-            </button>
+            {navItems[0] && (
+              <button
+                onClick={() => {
+                  if (navItems[0]?.onClick) navItems[0].onClick();
+                  else if (navItems[0]?.href) router.push(navItems[0].href);
+                }}
+                title={navItems[0]?.label || "Primary View"}
+                className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all cursor-pointer ${
+                  currentActiveKey === navItems[0].id
+                    ? isDark
+                      ? "!bg-white !text-[#1b5e43] shadow-md shadow-black/10 font-bold"
+                      : "!bg-[#1d6349] !text-white shadow-md shadow-green-900/15"
+                    : isDark
+                    ? "!text-emerald-200/80 hover:!bg-white/10 hover:!text-white"
+                    : "!text-slate-500 hover:!bg-slate-200/60 hover:!text-slate-900"
+                }`}
+              >
+                <LayoutGrid className="h-5 w-5" />
+              </button>
+            )}
 
-            {/* Logistics / Secondary View */}
-            <button
-              onClick={() => {
-                if (navItems[1]?.onClick) navItems[1].onClick();
-                else if (navItems[1]?.href) router.push(navItems[1].href);
-              }}
-              title={navItems[1]?.label || "Operations"}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
-                isDark
-                  ? "text-emerald-200/80 hover:bg-white/10 hover:text-white"
-                  : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
-              }`}
-            >
-              <Sliders className="h-4 w-4" />
-            </button>
+            {/* Operations / Secondary View */}
+            {navItems[1] && (
+              <button
+                onClick={() => {
+                  if (navItems[1]?.onClick) navItems[1].onClick();
+                  else if (navItems[1]?.href) router.push(navItems[1].href);
+                }}
+                title={navItems[1]?.label || "Secondary View"}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                  currentActiveKey === navItems[1].id
+                    ? isDark
+                      ? "!bg-white !text-[#1b5e43] shadow-md shadow-black/10 font-bold"
+                      : "!bg-[#1d6349] !text-white shadow-md shadow-green-900/15"
+                    : isDark
+                    ? "!text-emerald-200/80 hover:!bg-white/10 hover:!text-white"
+                    : "!text-slate-500 hover:!bg-slate-200/60 hover:!text-slate-900"
+                }`}
+              >
+                <Sliders className="h-4 w-4" />
+              </button>
+            )}
 
-            {/* Boxes / Consignments */}
-            <button
-              onClick={() => {
-                if (navItems[2]?.onClick) navItems[2].onClick();
-                else if (navItems[2]?.href) router.push(navItems[2].href);
-              }}
-              title={navItems[2]?.label || "Consignments"}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
-                isDark
-                  ? "text-emerald-200/80 hover:bg-white/10 hover:text-white"
-                  : "text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
-              }`}
-            >
-              <Boxes className="h-4 w-4" />
-            </button>
+            {/* Consignments / Third View */}
+            {navItems[2] && (
+              <button
+                onClick={() => {
+                  if (navItems[2]?.onClick) navItems[2].onClick();
+                  else if (navItems[2]?.href) router.push(navItems[2].href);
+                }}
+                title={navItems[2]?.label || "Consignments"}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                  currentActiveKey === navItems[2].id
+                    ? isDark
+                      ? "!bg-white !text-[#1b5e43] shadow-md shadow-black/10 font-bold"
+                      : "!bg-[#1d6349] !text-white shadow-md shadow-green-900/15"
+                    : isDark
+                    ? "!text-emerald-200/80 hover:!bg-white/10 hover:!text-white"
+                    : "!text-slate-500 hover:!bg-slate-200/60 hover:!text-slate-900"
+                }`}
+              >
+                <Boxes className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -438,14 +499,14 @@ export function DashboardSidebar({
                   key={item.id}
                   href={item.href || "#"}
                   onClick={handleClick}
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-medium transition-all group ${
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-full text-xs font-medium transition-all group !no-underline ${
                     isActive
                       ? isDark
-                        ? "bg-white text-[#154c36] font-bold shadow-md shadow-black/10"
-                        : "bg-[#1d6349] text-white font-bold shadow-sm"
+                        ? "!bg-white !text-[#154c36] font-bold shadow-md shadow-black/10"
+                        : "!bg-[#1d6349] !text-white font-bold shadow-sm"
                       : isDark
-                      ? "text-emerald-100/85 hover:bg-white/10 hover:text-white"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      ? "!text-emerald-100/90 hover:!bg-white/10 hover:!text-white"
+                      : "!text-slate-700 hover:!bg-slate-100 hover:!text-slate-900"
                   }`}
                 >
                   <div className="flex items-center gap-3 truncate">
@@ -453,25 +514,37 @@ export function DashboardSidebar({
                       className={`h-4 w-4 shrink-0 transition-transform group-hover:scale-105 ${
                         isActive
                           ? isDark
-                            ? "text-[#154c36]"
-                            : "text-white"
+                            ? "!text-[#154c36]"
+                            : "!text-white"
                           : isDark
-                          ? "text-emerald-200/80"
-                          : "text-slate-400 group-hover:text-slate-600"
+                          ? "!text-emerald-200/80"
+                          : "!text-slate-500 group-hover:!text-slate-700"
                       }`}
                     />
-                    <span className="truncate">{item.label}</span>
+                    <span
+                      className={`truncate ${
+                        isActive
+                          ? isDark
+                            ? "!text-[#154c36] font-bold"
+                            : "!text-white font-bold"
+                          : isDark
+                          ? "!text-emerald-100/90 group-hover:!text-white"
+                          : "!text-slate-700 group-hover:!text-slate-900"
+                      }`}
+                    >
+                      {item.label}
+                    </span>
                   </div>
                   {item.badge && (
                     <span
                       className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                         isActive
                           ? isDark
-                            ? "bg-[#154c36]/15 text-[#154c36]"
-                            : "bg-white/20 text-white"
+                            ? "!bg-[#154c36]/15 !text-[#154c36]"
+                            : "!bg-white/20 !text-white"
                           : isDark
-                          ? "bg-emerald-800 text-emerald-200"
-                          : "bg-slate-200 text-slate-700"
+                          ? "!bg-emerald-800 !text-emerald-200"
+                          : "!bg-slate-200 !text-slate-700"
                       }`}
                     >
                       {item.badge}
@@ -493,15 +566,15 @@ export function DashboardSidebar({
           <div className="flex flex-col gap-1.5">
             <button
               onClick={() => setNotificationsOpen(true)}
-              className={`flex items-center justify-between px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
+              className={`flex items-center justify-between px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer !no-underline ${
                 isDark
-                  ? "text-emerald-200/85 hover:bg-white/10 hover:text-white"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  ? "!text-emerald-200/85 hover:!bg-white/10 hover:!text-white"
+                  : "!text-slate-600 hover:!bg-slate-100 hover:!text-slate-900"
               }`}
             >
               <div className="flex items-center gap-3">
-                <Bell className="h-4 w-4 shrink-0 opacity-70" />
-                <span>Reports & Alerts</span>
+                <Bell className={`h-4 w-4 shrink-0 ${isDark ? "text-emerald-300" : "text-slate-500"}`} />
+                <span className={isDark ? "!text-emerald-100/90" : "!text-slate-700"}>Live Notifications</span>
               </div>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-red-500 text-white font-bold text-[10px]">
