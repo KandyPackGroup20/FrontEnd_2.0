@@ -79,12 +79,23 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
       !o.blocked_reasons?.includes("ORDER_ALREADY_ASSIGNED") &&
       !["DELIVERED", "COMPLETED", "CANCELLED"].includes((o.order_status || "").toUpperCase())
   );
-  const eligibleCandidates = routeCandidates.filter(
-    (o) => Boolean(o.eligible) && (!o.blocked_reasons || o.blocked_reasons.length === 0)
-  );
-  const ineligibleCount = routeCandidates.length - eligibleCandidates.length;
 
-  const candidates = showIneligible ? routeCandidates : eligibleCandidates;
+  // An order is received when its goods have arrived and been received at this station depot
+  const isOrderReceived = (o: CargoOrder) => {
+    if (o.blocked_reasons?.includes("ORDER_NOT_FULLY_RECEIVED")) {
+      return false;
+    }
+    if (o.items && o.items.length > 0 && o.items.some((i) => Number(i.received_quantity) < Number(i.ordered_quantity))) {
+      return false;
+    }
+    return true;
+  };
+
+  const receivedCandidates = routeCandidates.filter((o) => isOrderReceived(o));
+  const unreceivedCount = routeCandidates.length - receivedCandidates.length;
+
+  // Display all received orders by default
+  const candidates = showIneligible ? routeCandidates : receivedCandidates;
   const selectedWeight = candidates.filter((o) => selected.includes(o.order_id)).reduce((sum, o) => sum + Number(o.weight_kg), 0);
   const total = Number(current.cargo_weight_kg) + selectedWeight;
   const verified = current.capacity_unit === "KG";
