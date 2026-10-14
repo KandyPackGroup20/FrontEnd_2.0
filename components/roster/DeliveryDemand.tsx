@@ -58,6 +58,7 @@ export default function DeliveryDemand({ catalog, range, writable, onCreated }: 
   }, [station, range.from, range.to, refresh]);
 
   const [hideScheduledDemand, setHideScheduledDemand] = useState(false);
+  const [onlyEligibleDemand, setOnlyEligibleDemand] = useState(false);
 
   function chooseStore(value: string) {
     setStation(value);
@@ -66,14 +67,18 @@ export default function DeliveryDemand({ catalog, range, writable, onCreated }: 
     setMessage(null);
   }
 
-  const displayedOrders = hideScheduledDemand
-    ? orders.filter(
-        (o) =>
-          o.assigned_roster_id === null &&
-          o.delivery_id === null &&
-          !o.blocked_reasons?.includes("ORDER_ALREADY_ASSIGNED")
-      )
-    : orders;
+  let displayedOrders = orders;
+  if (hideScheduledDemand) {
+    displayedOrders = displayedOrders.filter(
+      (o) =>
+        o.assigned_roster_id === null &&
+        o.delivery_id === null &&
+        !o.blocked_reasons?.includes("ORDER_ALREADY_ASSIGNED")
+    );
+  }
+  if (onlyEligibleDemand) {
+    displayedOrders = displayedOrders.filter((o) => o.eligible);
+  }
 
   const groups = new Map<string, CargoOrder[]>();
   for (const order of displayedOrders) {
@@ -101,7 +106,7 @@ export default function DeliveryDemand({ catalog, range, writable, onCreated }: 
     
     {/* Tab 1: Delivery Demand */}
     {tab === "demand" && loadedStation === station && station && <div role="tabpanel" id="demand-panel" aria-labelledby="demand-tab">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer select-none text-text-muted hover:text-text-main">
           <input
             type="checkbox"
@@ -110,6 +115,15 @@ export default function DeliveryDemand({ catalog, range, writable, onCreated }: 
             className="rounded border-slate-300"
           />
           <span>Hide orders already scheduled to a truck</span>
+        </label>
+        <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer select-none text-text-muted hover:text-text-main">
+          <input
+            type="checkbox"
+            checked={onlyEligibleDemand}
+            onChange={(e) => setOnlyEligibleDemand(e.target.checked)}
+            className="rounded border-slate-300"
+          />
+          <span>Only show orders received & eligible for dispatch</span>
         </label>
       </div>
       {groups.size === 0 ? <p className="glass p-6">No orders for this station in the selected week.</p> : [...groups].map(([group, rows]) => <section key={group} className="mb-6">

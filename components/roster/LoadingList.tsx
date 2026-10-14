@@ -56,6 +56,8 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
   const [refresh, setRefresh] = useState(0);
   const submitting = useRef(false);
 
+  const [showIneligible, setShowIneligible] = useState(false);
+
   useEffect(() => {
     const controller = new AbortController();
     getLoadingList(schedule.roster_id, controller.signal).then((result) => {
@@ -68,7 +70,7 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
 
   const current = data?.schedule ?? schedule;
   const assigned = new Set(data?.orders.map((o) => o.order_id));
-  const candidates = demand.filter(
+  const routeCandidates = demand.filter(
     (o) =>
       o.route_id === schedule.route_id &&
       !assigned.has(o.order_id) &&
@@ -77,6 +79,12 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
       !o.blocked_reasons?.includes("ORDER_ALREADY_ASSIGNED") &&
       !["DELIVERED", "COMPLETED", "CANCELLED"].includes((o.order_status || "").toUpperCase())
   );
+  const eligibleCandidates = routeCandidates.filter(
+    (o) => Boolean(o.eligible) && (!o.blocked_reasons || o.blocked_reasons.length === 0)
+  );
+  const ineligibleCount = routeCandidates.length - eligibleCandidates.length;
+
+  const candidates = showIneligible ? routeCandidates : eligibleCandidates;
   const selectedWeight = candidates.filter((o) => selected.includes(o.order_id)).reduce((sum, o) => sum + Number(o.weight_kg), 0);
   const total = Number(current.cargo_weight_kg) + selectedWeight;
   const verified = current.capacity_unit === "KG";
@@ -113,16 +121,68 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
     {!data ? <p className="mt-5" role="status">Loading assigned orders…</p> : data.orders.length === 0 ? <p className="mt-5">No orders assigned yet.</p> :
       <ul className="mt-5 grid gap-5 md:grid-cols-2">{data.orders.map((order) => <li key={order.order_id} className="rounded-2xl border border-green-100 p-4"><OrderDetails order={order} /></li>)}</ul>}
     {writable && <div className="mt-7">
-      <h4 className="font-semibold">Add whole orders on this route</h4>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="font-semibold">Add whole orders on this route</h4>
+        {ineligibleCount > 0 && (
+          <label className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-main cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showIneligible}
+              onChange={(e) => setShowIneligible(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            <span>Show unreceived / pending orders ({ineligibleCount})</span>
+          </label>
+        )}
+      </div>
+
       {!canAssign && <p className="mt-2 text-sm">{!verified ? "Verify the truck capacity unit before assigning orders." : "Only active trucks on scheduled runs accept orders."}</p>}
-      {candidates.length === 0 ? <p className="mt-3 text-sm">No additional orders on this route in the selected date range.</p> :
-        <ul className="mt-4 space-y-4">{candidates.map((order) => <li key={order.order_id} className="rounded-2xl border border-green-100 p-4">
-          <label className="mb-3 flex min-h-11 items-center gap-3">
-            <input type="checkbox" checked={selected.includes(order.order_id)} disabled={busy || !canAssign || !order.eligible || !data}
-              onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, order.order_id] : ids.filter((id) => id !== order.order_id))} />
-            Select whole order #{order.order_id}
-          </label><OrderDetails order={order} />
-        </li>)}</ul>}
+
+      {candidates.length === 0 ? (
+        <div className="mt-3 p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-sm text-text-muted">
+          <p className="font-medium text-text-main">No orders currently ready for loading on this route.</p>
+          {ineligibleCount > 0 && !showIneligible && (
+            <p className="mt-1 text-xs text-slate-500">
+              There are {ineligibleCount} order{ineligibleCount === 1 ? "" : "s"} on this route in the selected date range, but goods must be received at this station depot before they can be loaded onto a truck.
+            </p>
+          )}
+        </div>
+      ) : (
+        <ul className="mt-4 space-y-4">
+          {candidates.map((order) => (
+            <li
+              key={order.order_id}
+              className={`rounded-2xl border p-4 ${
+                order.eligible ? "border-green-100 bg-white" : "border-slate-200 bg-slate-50/60 opacity-80"
+              }`}
+            >
+              <label className="mb-3 flex min-h-11 items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(order.order_id)}
+                  disabled={busy || !canAssign || !order.eligible || !data}
+                  onChange={(event) =>
+                    setSelected((ids) =>
+                      event.target.checked
+                        ? [...ids, order.order_id]
+                        : ids.filter((id) => id !== order.order_id)
+                    )
+                  }
+                />
+                <span className={order.eligible ? "font-medium" : "text-text-muted"}>
+                  Select whole order #{order.order_id}
+                </span>
+                {!order.eligible && (
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                    Awaiting goods receipt
+                  </span>
+                )}
+              </label>
+              <OrderDetails order={order} />
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="mt-4 text-sm" aria-live="polite">{selected.length} selected · planned total {total.toFixed(2)} kg</p>
       {verified && total > Number(current.capacity) && <p className="text-sm" role="alert">This selection exceeds truck capacity.</p>}
       <button className="btn-primary mt-3 px-6 py-3 disabled:opacity-50" onClick={save}
