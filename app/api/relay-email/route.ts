@@ -27,9 +27,9 @@ export async function POST(req: Request) {
         user: smtpUser,
         pass: smtpPass,
       },
-      connectionTimeout: 3000,
-      greetingTimeout: 3000,
-      socketTimeout: 5000,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
 
     const info = await transporter.sendMail({
