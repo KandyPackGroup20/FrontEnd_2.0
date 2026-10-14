@@ -286,12 +286,20 @@ function ProfileContent() {
     try {
       await fetch("/api/v1/auth/logout", {
         method: "POST",
+        credentials: "include",
       });
     } catch (e) {
       console.error(e);
     }
 
-    router.push("/login");
+    if (typeof window !== "undefined") {
+      document.cookie =
+        "kandypack_session=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      localStorage.removeItem("kandypack_user");
+      localStorage.removeItem("kandypack_auth_token");
+      sessionStorage.clear();
+      window.location.href = "/login?switch=1";
+    }
   }
 
   async function handleSave(e: React.FormEvent) {

@@ -38,6 +38,7 @@ import {
   AlertsSidebar,
   LogisticsNotification,
 } from "@/components/notifications/AlertsSidebar";
+import { setAuthToken } from "@/lib/api";
 
 export interface DashboardUser {
   user_id?: number;
@@ -171,9 +172,21 @@ export function DashboardSidebar({
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/v1/auth/logout", { method: "POST" });
+      await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {}
-    router.push("/login");
+
+    if (typeof window !== "undefined") {
+      setAuthToken(null);
+      document.cookie =
+        "kandypack_session=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      localStorage.removeItem("kandypack_user");
+      localStorage.removeItem("kandypack_auth_token");
+      sessionStorage.clear();
+      window.location.href = "/login?switch=1";
+    }
   };
 
   // Compute navigation items STRICTLY for each role

@@ -146,11 +146,21 @@ export default function OrdersPage() {
 
   async function handleLogout() {
     try {
-      await fetch("/api/v1/auth/logout", { method: "POST" });
+      await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {
       // quiet fallback
     }
-    window.location.href = "/login";
+    if (typeof window !== "undefined") {
+      document.cookie =
+        "kandypack_session=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      localStorage.removeItem("kandypack_user");
+      localStorage.removeItem("kandypack_auth_token");
+      sessionStorage.clear();
+      window.location.href = "/login?switch=1";
+    }
   }
 
   const loadUserSession = useCallback(async () => {
