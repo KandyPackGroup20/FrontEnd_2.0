@@ -68,7 +68,15 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
 
   const current = data?.schedule ?? schedule;
   const assigned = new Set(data?.orders.map((o) => o.order_id));
-  const candidates = demand.filter((o) => o.route_id === schedule.route_id && !assigned.has(o.order_id));
+  const candidates = demand.filter(
+    (o) =>
+      o.route_id === schedule.route_id &&
+      !assigned.has(o.order_id) &&
+      o.assigned_roster_id === null &&
+      o.delivery_id === null &&
+      !o.blocked_reasons?.includes("ORDER_ALREADY_ASSIGNED") &&
+      !["DELIVERED", "COMPLETED", "CANCELLED"].includes((o.order_status || "").toUpperCase())
+  );
   const selectedWeight = candidates.filter((o) => selected.includes(o.order_id)).reduce((sum, o) => sum + Number(o.weight_kg), 0);
   const total = Number(current.cargo_weight_kg) + selectedWeight;
   const verified = current.capacity_unit === "KG";
