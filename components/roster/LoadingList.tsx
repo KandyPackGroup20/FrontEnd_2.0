@@ -92,7 +92,7 @@ export default function LoadingList({ schedule, demand, writable, onSaved, onClo
   };
 
   const receivedCandidates = routeCandidates.filter((o) => isOrderReceived(o));
-  const unreceivedCount = routeCandidates.length - receivedCandidates.length;
+  const ineligibleCount = routeCandidates.length - receivedCandidates.length;
 
   // Display all received orders by default
   const candidates = showIneligible ? routeCandidates : receivedCandidates;
