@@ -189,6 +189,28 @@ const REPORT_DEFINITIONS: ReportDefinition[] = [
       { key: "details", label: "Entity Details" },
     ],
   },
+  {
+    id: "customer-order-history",
+    title: "9. Customer Order History with Delivery Details",
+    shortTitle: "Order History",
+    category: "Sales & Revenue",
+    description: "End-to-end customer order history tracking rail allocations, departure schedules, manifests, and truck delivery details.",
+    endpoint: "/api/v1/reports/customer-order-history",
+    icon: Package,
+    columns: [
+      { key: "order_id", label: "Order ID", align: "center" },
+      { key: "customer_name", label: "Customer" },
+      { key: "order_date", label: "Order Date", align: "center" },
+      { key: "delivery_date", label: "Delivery Date", align: "center" },
+      { key: "order_status", label: "Order Status", align: "center" },
+      { key: "route_name", label: "Delivery Route" },
+      { key: "allocated_quantity", label: "Rail Units", align: "right" },
+      { key: "allocated_space", label: "Rail Space (m³)", align: "right" },
+      { key: "plate_number", label: "Truck Assigned", align: "center" },
+      { key: "delivery_status", label: "Delivery Status", align: "center" },
+      { key: "delivered_at", label: "Delivered Time" },
+    ],
+  },
 ];
 
 function getFirstArray(data: any): ReportRow[] {

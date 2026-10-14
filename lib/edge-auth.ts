@@ -29,22 +29,8 @@ export async function middleware(request: NextRequest) {
       if (result.ok) session = await result.json() as Session;
       else if (result.status !== 401 && result.status !== 403) throw new Error('Session service unavailable');
     } catch {
-      // In case of backend cold start timeout or connectivity drop, verify unexpired JWT claims
-      try {
-        const parts = (token || '').split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-          if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
-            session = {
-              user_id: Number(payload.sub),
-              role: String(payload.role),
-              force_password_reset: Boolean(payload.force_password_reset),
-            };
-          }
-        }
-      } catch {}
-
-      if (!session && protectedPage) {
+      // Security fix: Do not accept unverified decoded claims without cryptographic signature verification
+      if (protectedPage) {
         return new NextResponse('Session verification is temporarily unavailable. Please retry.', { status: 503 });
       }
     }

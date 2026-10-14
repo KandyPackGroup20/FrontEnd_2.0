@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -164,12 +164,15 @@ const FALLBACK_ROUTES: Record<string, DeliveryRouteOption[]> = {
   CMB: [
     { route_id: 1, route_name: "Colombo Central Commercial Route", station_id: 1, city: "Colombo", max_delivery_time: "04:30:00" },
     { route_id: 2, route_name: "Greater Colombo Industrial Hub Route", station_id: 1, city: "Colombo", max_delivery_time: "06:00:00" },
+    { route_id: 8, route_name: "Colombo Suburbs & Kelaniya Route", station_id: 1, city: "Colombo", max_delivery_time: "04:00:00" },
   ],
   GAL: [
     { route_id: 3, route_name: "Galle Coastal Route", station_id: 3, city: "Galle", max_delivery_time: "05:00:00" },
+    { route_id: 9, route_name: "Galle Southern Inland Route", station_id: 3, city: "Galle", max_delivery_time: "05:30:00" },
   ],
   NEG: [
     { route_id: 4, route_name: "Negombo Coastal & Industrial Route", station_id: 2, city: "Negombo", max_delivery_time: "04:00:00" },
+    { route_id: 11, route_name: "Negombo Airport & Katunayake Logistics Route", station_id: 2, city: "Negombo", max_delivery_time: "03:00:00" },
   ],
   MAT: [
     { route_id: 5, route_name: "Matara Southern Express Route", station_id: 4, city: "Matara", max_delivery_time: "04:30:00" },
@@ -201,10 +204,16 @@ export default function NewOrderPage() {
   const [routesList, setRoutesList] = useState<DeliveryRouteOption[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<number>(1);
 
-  // Schedule state
+  // Schedule state - Enforce at least 7-day advance booking notice per Kandypack policy
+  const minBookingDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split("T")[0];
+  }, []);
+
   const [bookingDate, setBookingDate] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 1);
+    d.setDate(d.getDate() + 7);
     return d.toISOString().split("T")[0];
   });
   const [slot, setSlot] = useState("06:30 AM Express Rail 101");
@@ -929,15 +938,20 @@ export default function NewOrderPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-text-heading mb-1.5">
-                        Departure Date
+                      <label className="block text-xs font-bold uppercase tracking-wider text-text-heading mb-1.5 flex items-center justify-between">
+                        <span>Departure Date</span>
+                        <span className="text-[10px] text-green-700 font-semibold normal-case">Min 7 days advance</span>
                       </label>
                       <input
                         type="date"
+                        min={minBookingDate}
                         value={bookingDate}
                         onChange={(e) => setBookingDate(e.target.value)}
                         className="w-full rounded-xl bg-white border border-green-200 px-3.5 py-2.5 text-sm text-text-heading focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-600 shadow-xs"
                       />
+                      <p className="text-[11px] text-text-muted mt-1">
+                        Orders must be placed at least 7 days in advance for rail freight scheduling.
+                      </p>
                     </div>
 
                     <div>

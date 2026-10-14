@@ -45,11 +45,15 @@ jobs:
           docker build -t kandypack-frontend:${{ github.sha }} .
           echo "Frontend Docker image built successfully."
 
-      - name: Emit Frontend Deployment Status Summary
+      - name: Emit Frontend Build & Verification Status Summary
         run: |
-          echo "### 🟢 Frontend Deployment Status: LIVE" >> $GITHUB_STEP_SUMMARY
+          echo "### 🟢 Frontend CI/CD: VERIFICATION COMPLETE" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Target | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
           echo "|  Next.js 16 | TypeScript & SSR Compilation |  PASSED |" >> $GITHUB_STEP_SUMMARY
-          echo "|  Container | Docker Buildx Image |  BUILT |" >> $GITHUB_STEP_SUMMARY
-          echo "|  Hosting | Vercel / Cloud Run |  LIVE |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Container | Docker Buildx Image |  BUILT / VERIFIED |" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ secrets.DEPLOY_HOOK_URL }}" ]; then
+            echo "|  Hosting | Vercel / Cloud Run |  TRIGGERED |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "|  Hosting | Vercel / Cloud Run |  BUILT (DEPLOY PENDING SECRETS) |" >> $GITHUB_STEP_SUMMARY
+          fi
